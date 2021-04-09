@@ -23,7 +23,6 @@ namespace Libplanet.Stun
         private static readonly TimeSpan TurnAllocationLifetime = TimeSpan.FromSeconds(777);
         private readonly string _host;
         private readonly int _port;
-        private readonly IList<TcpClient> _relayedClients;
         private readonly IDictionary<byte[], TaskCompletionSource<StunMessage>>
             _responses;
 
@@ -46,7 +45,6 @@ namespace Libplanet.Stun
             Username = username;
             Password = password;
 
-            _relayedClients = new List<TcpClient>();
             _connectionAttempts =
                 new AsyncProducerConsumerQueue<ConnectionAttempt>();
             _responses =
@@ -187,7 +185,6 @@ namespace Libplanet.Stun
                 byte[] id = attempt.ConnectionId;
                 var bindRequest = new ConnectionBindRequest(id);
                 var relayedClient = new TcpClient(_host, _port);
-                _relayedClients.Add(relayedClient);
                 NetworkStream relayedStream = relayedClient.GetStream();
 
                 try
@@ -198,9 +195,11 @@ namespace Libplanet.Stun
 
                     if (bindResponse is ConnectionBindSuccessResponse)
                     {
-                        return relayedStream;
+                        return (relayedClient, relayedStream);
                     }
 
+                    relayedStream.Dispose();
+                    relayedClient.Dispose();
                     throw new TurnClientException("ConnectionBind failed.", bindResponse);
                 }
                 catch (IOException e)
@@ -209,6 +208,9 @@ namespace Libplanet.Stun
                         e,
                         "The connection seems to disconnect before parsing; ignored."
                     );
+
+                    relayedStream.Dispose();
+                    relayedClient.Dispose();
                 }
             }
         }
@@ -306,7 +308,8 @@ namespace Libplanet.Stun
                 tcpClient.Connect(new IPEndPoint(IPAddress.Loopback, listenPort));
 #pragma warning restore PC001
                 NetworkStream localStream = tcpClient.GetStream();
-                NetworkStream turnStream = await AcceptRelayedStreamAsync(cancellationToken);
+                (TcpClient relayedClient, NetworkStream turnStream) =
+                    await AcceptRelayedStreamAsync(cancellationToken);
 #pragma warning disable CS4014
 
                 const int bufferSize = 8042;
@@ -319,6 +322,7 @@ namespace Libplanet.Stun
                         turnStream.Dispose();
                         localStream.Dispose();
                         tcpClient.Dispose();
+                        relayedClient.Dispose();
                     },
                     cancellationToken
                 );
@@ -345,7 +349,7 @@ namespace Libplanet.Stun
                 {
                     await Task.Delay(lifetime - TimeSpan.FromMinutes(1), cancellationToken);
                     _logger.Debug("Refreshing TURN allocation...");
-                    lifetime = await RefreshAllocationAsync(lifetime);
+                    lifetime = await RefreshAllocationAsync(lifetime, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
                 }
                 catch (OperationCanceledException e)
@@ -443,11 +447,6 @@ namespace Libplanet.Stun
             _turnTaskCts.Dispose();
             _turnTasks.Clear();
             ClearResponses();
-
-            foreach (TcpClient relays in _relayedClients)
-            {
-                relays.Dispose();
-            }
         }
 
         private void ClearResponses()
