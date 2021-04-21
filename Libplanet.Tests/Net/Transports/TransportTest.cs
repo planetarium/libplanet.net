@@ -28,18 +28,13 @@ namespace Libplanet.Tests.Net.Transports
             TransportConstructor { get; set; }
 
         [SkippableFact(Timeout = Timeout)]
-        public async Task RunAsync()
+        public void StartAsync()
         {
             ITransport transport = CreateTransport();
 
             try
             {
-                // RunAsync() throws NRE if it is not started yet.
-                await Assert.ThrowsAsync<TransportException>(
-                    async () => await transport.RunAsync());
-                await transport.StartAsync();
-                Assert.False(transport.Running);
-                _ = transport.RunAsync();
+                _ = transport.StartAsync();
                 Assert.True(transport.Running);
             }
             finally
@@ -235,8 +230,7 @@ namespace Libplanet.Tests.Net.Transports
             ITransport transport,
             CancellationToken cts = default)
         {
-            await transport.StartAsync(cts);
-            Task task = transport.RunAsync(cts);
+            Task task = transport.StartAsync(cts);
 
             while (!transport.Running)
             {

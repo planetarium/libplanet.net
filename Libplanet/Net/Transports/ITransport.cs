@@ -40,23 +40,13 @@ namespace Libplanet.Net.Transports
         bool Running { get; }
 
         /// <summary>
-        /// Initiates transport layer.
+        /// Initiates and runs transport layer.
         /// </summary>
         /// <param name="cancellationToken">
         /// A cancellation token used to propagate notification that this
         /// operation should be canceled.</param>
         /// <returns>An awaitable task without value.</returns>
         Task StartAsync(CancellationToken cancellationToken = default);
-
-        /// <summary>
-        /// Starts running transport layer. To <see cref="RunAsync"/>, you should call
-        /// <see cref="StartAsync"/> first.
-        /// </summary>
-        /// <param name="cancellationToken">
-        /// A cancellation token used to propagate notification that this
-        /// operation should be canceled.</param>
-        /// <returns>An awaitable task without value.</returns>
-        Task RunAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Stops running transport layer.

@@ -279,21 +279,6 @@ namespace Libplanet.Net.Transports
             _router.ReceiveReady += ReceiveMessage;
             _replyQueue.ReceiveReady += DoReply;
             _broadcastQueue.ReceiveReady += DoBroadcast;
-        }
-
-        /// <inheritdoc />
-        public async Task RunAsync(CancellationToken cancellationToken)
-        {
-            if (Running)
-            {
-                throw new TransportException("Transport is already running.");
-            }
-
-            if (_router is null)
-            {
-                throw new TransportException(
-                    $"Transport needs to be started before {nameof(RunAsync)}().");
-            }
 
             List<Task> tasks = new List<Task>();
 
