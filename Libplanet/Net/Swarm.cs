@@ -163,13 +163,13 @@ namespace Libplanet.Net
             }
         }
 
-        public bool Running => Transport.Running;
+        public bool Running => Transport?.Running ?? false;
 
         public DnsEndPoint EndPoint => AsPeer is BoundPeer boundPeer ? boundPeer.EndPoint : null;
 
         public Address Address => _privateKey.ToAddress();
 
-        public Peer AsPeer => Transport.AsPeer;
+        public Peer AsPeer => Transport?.AsPeer;
 
         /// <summary>
         /// The last time when any message was arrived.

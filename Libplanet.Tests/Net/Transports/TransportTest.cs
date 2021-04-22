@@ -215,10 +215,36 @@ namespace Libplanet.Tests.Net.Transports
                 Message reply = await transportA.SendMessageWithReplyAsync(
                     (BoundPeer)transportB.AsPeer,
                     new Ping(),
-                    null,
+                    TimeSpan.FromSeconds(3),
                     CancellationToken.None);
 
                 Assert.IsType<Pong>(reply);
+            }
+            finally
+            {
+                transportA.Dispose();
+                transportB.Dispose();
+            }
+        }
+
+        // This also tests ITransport.ReplyMessage at the same time.
+        [SkippableFact(Timeout = Timeout)]
+        public async Task SendMessageWithReplyAsyncTimeout()
+        {
+            ITransport transportA = CreateTransport();
+            ITransport transportB = CreateTransport();
+
+            try
+            {
+                await InitializeAsync(transportA);
+                await InitializeAsync(transportB);
+
+                await Assert.ThrowsAsync<TimeoutException>(
+                    async () => await transportA.SendMessageWithReplyAsync(
+                        (BoundPeer)transportB.AsPeer,
+                        new Ping(),
+                        TimeSpan.FromSeconds(3),
+                        CancellationToken.None));
             }
             finally
             {

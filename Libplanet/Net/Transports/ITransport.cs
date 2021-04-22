@@ -54,6 +54,8 @@ namespace Libplanet.Net.Transports
         /// A cancellation token used to propagate notification that this
         /// operation should be canceled.</param>
         /// <returns>An awaitable task without value.</returns>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         Task StartAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -65,6 +67,8 @@ namespace Libplanet.Net.Transports
         /// A cancellation token used to propagate notification that this
         /// operation should be canceled.</param>
         /// <returns>An awaitable task without value.</returns>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         Task StopAsync(
             TimeSpan waitFor,
             CancellationToken cancellationToken = default);
@@ -85,6 +89,8 @@ namespace Libplanet.Net.Transports
         /// A cancellation token used to propagate notification that this
         /// operation should be canceled.</param>
         /// <returns>An awaitable task without value.</returns>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         Task SendMessageAsync(BoundPeer peer, Message message, CancellationToken cancellationToken);
 
         /// <summary>
@@ -99,6 +105,8 @@ namespace Libplanet.Net.Transports
         /// operation should be canceled.</param>
         /// <returns>The replies of the <paramref name="message"/>
         /// sent by <paramref name="peer"/>.</returns>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         Task<Message> SendMessageWithReplyAsync(
             BoundPeer peer,
             Message message,
@@ -118,6 +126,8 @@ namespace Libplanet.Net.Transports
         /// operation should be canceled.</param>
         /// <returns>The replies of the <paramref name="message"/>
         /// sent by <paramref name="peer"/>.</returns>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         Task<IEnumerable<Message>> SendMessageWithReplyAsync(
             BoundPeer peer,
             Message message,
@@ -131,6 +141,8 @@ namespace Libplanet.Net.Transports
         /// <param name="except">An <see cref="Address"/> to exclude from broadcasting.
         /// If <c>null</c> is given, no peers will be excluded.</param>
         /// <param name="message">A <see cref="Message"/> to broadcast.</param>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         void BroadcastMessage(Address? except, Message message);
 
         /// <summary>
@@ -146,6 +158,8 @@ namespace Libplanet.Net.Transports
         /// A cancellation token used to propagate notification that this
         /// operation should be canceled.</param>
         /// <returns>An awaitable task without value.</returns>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         Task ReplyMessageAsync(Message message, CancellationToken cancellationToken);
     }
 }
