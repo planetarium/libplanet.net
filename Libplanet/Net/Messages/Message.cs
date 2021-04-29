@@ -326,6 +326,39 @@ namespace Libplanet.Net.Messages
             return message;
         }
 
+        // TODO: reply is not required anymore.
+        public static Message Deserialize(
+            byte[] bytes,
+            AppProtocolVersion localVersion,
+            IImmutableSet<PublicKey> trustedAppProtocolVersionSigners,
+            DifferentAppProtocolVersionEncountered differentAppProtocolVersionEncountered,
+            TimeSpan? lifetime)
+        {
+            using var stream = new MemoryStream(bytes);
+            var buffer = new byte[sizeof(int)];
+            stream.Read(buffer, 0, sizeof(int));
+            int frameCount = BitConverter.ToInt32(buffer, 0);
+            var frames = new List<NetMQFrame>();
+            for (var i = 0; i < frameCount; i++)
+            {
+                buffer = new byte[sizeof(int)];
+                stream.Read(buffer, 0, sizeof(int));
+                int frameSize = BitConverter.ToInt32(buffer, 0);
+                buffer = new byte[frameSize];
+                stream.Read(buffer, 0, frameSize);
+                frames.Add(new NetMQFrame(buffer));
+            }
+
+            NetMQMessage message = new NetMQMessage(frames);
+            return Parse(
+                message,
+                false,
+                localVersion,
+                trustedAppProtocolVersionSigners,
+                differentAppProtocolVersionEncountered,
+                lifetime);
+        }
+
         /// <summary>
         /// Casts the message to <see cref="NetMQMessage"/> with given <paramref name="key"/>,
         /// <paramref name="peer"/> and <paramref name="version"/>.
@@ -379,6 +412,24 @@ namespace Libplanet.Net.Messages
             }
 
             return message;
+        }
+
+        public byte[] Serialize(
+            PrivateKey key,
+            Peer peer,
+            DateTimeOffset timestamp,
+            AppProtocolVersion version)
+        {
+            NetMQMessage netMqMessage = ToNetMQMessage(key, peer, timestamp, version);
+            using var stream = new MemoryStream();
+            stream.Write(BitConverter.GetBytes(netMqMessage.FrameCount), 0, sizeof(int));
+            foreach (var frame in netMqMessage)
+            {
+                stream.Write(BitConverter.GetBytes(frame.BufferSize), 0, sizeof(int));
+                stream.Write(frame.ToByteArray(), 0, frame.BufferSize);
+            }
+
+            return stream.ToArray();
         }
 
         protected static Peer DeserializePeer(byte[] bytes)

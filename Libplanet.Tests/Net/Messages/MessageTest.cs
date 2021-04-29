@@ -193,5 +193,33 @@ namespace Libplanet.Tests.Net.Messages
                     TimeSpan.FromSeconds(1));
             });
         }
+
+        [Fact]
+        public void Serialize()
+        {
+            var privateKey = new PrivateKey();
+            var peer = new Peer(privateKey.PublicKey);
+            var dateTimeOffset = DateTimeOffset.UtcNow;
+            var appProtocolVersion = new AppProtocolVersion(
+                1,
+                new Bencodex.Types.Integer(0),
+                ImmutableArray<byte>.Empty,
+                default(Address));
+            var message = new Ping();
+            var id = Guid.NewGuid();
+            message.Identity = id.ToByteArray();
+            byte[] serialized =
+                message.Serialize(privateKey, peer, dateTimeOffset, appProtocolVersion);
+            Message deserialized = Message.Deserialize(
+                serialized,
+                appProtocolVersion,
+                null,
+                null,
+                null);
+            Assert.Equal(peer, deserialized.Remote);
+            Assert.Equal(appProtocolVersion, deserialized.Version);
+            Assert.Equal(dateTimeOffset, deserialized.Timestamp);
+            Assert.Equal(id.ToByteArray(), deserialized.Identity);
+        }
     }
 }
