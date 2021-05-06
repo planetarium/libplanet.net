@@ -1522,7 +1522,7 @@ namespace Libplanet.Tests.Net
 
                 // Awaits 1 second because receiver swarm may tried to fill again after filled.
                 await Task.Delay(1000);
-                var transport = receiver.Transport as NetMQTransport;
+                var transport = receiver.Transport;
                 Log.Debug("Messages: {@Message}", transport.MessageHistory);
                 Assert.Single(
                     transport.MessageHistory.Where(msg => msg is Libplanet.Net.Messages.Blocks));

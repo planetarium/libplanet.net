@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Threading;
@@ -40,6 +41,13 @@ namespace Libplanet.Net.Transports
         bool Running { get; }
 
         /// <summary>
+        /// A fixed sized queue that keeps history of <see cref="Message"/> received.
+        /// It saves at most 30 recent <see cref="Message"/>s.
+        /// </summary>
+        [Pure]
+        ConcurrentQueue<Message> MessageHistory { get; }
+
+        /// <summary>
         /// Initiates and runs transport layer.
         /// </summary>
         /// <param name="cancellationToken">
@@ -60,6 +68,13 @@ namespace Libplanet.Net.Transports
         Task StopAsync(
             TimeSpan waitFor,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Waits until this <see cref="ITransport"/> instance gets started to run.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> completed when <see cref="ITransport.Running"/>
+        /// property becomes <c>true</c>.</returns>
+        Task WaitForRunningAsync();
 
         /// <summary>
         /// Sends the <paramref name="message"/> to given <paramref name="peer"/>.

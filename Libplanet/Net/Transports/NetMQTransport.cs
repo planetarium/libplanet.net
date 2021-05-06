@@ -226,7 +226,8 @@ namespace Libplanet.Net.Transports
             }
         }
 
-        internal FixedSizedQueue<Message> MessageHistory { get; }
+        /// <inheritdoc cref="ITransport.MessageHistory"/>
+        public ConcurrentQueue<Message> MessageHistory { get; }
 
         internal IPAddress PublicIPAddress => _turnClient?.PublicAddress;
 
@@ -360,12 +361,7 @@ namespace Libplanet.Net.Transports
             }
         }
 
-        /// <summary>
-        /// Waits until this <see cref="NetMQTransport"/> instance gets started to run.
-        /// </summary>
-        /// <seealso cref="Swarm{T}.WaitForRunningAsync()"/>
-        /// <returns>A <see cref="Task"/> completed when <see cref="Running"/>
-        /// property becomes <c>true</c>.</returns>
+        /// <inheritdoc cref="ITransport.WaitForRunningAsync"/>
         public Task WaitForRunningAsync() => _runningEvent.Task;
 
         /// <inheritdoc />

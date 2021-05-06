@@ -163,7 +163,7 @@ namespace Libplanet.Net
             }
         }
 
-        public bool Running => Transport is NetMQTransport p && p.Running;
+        public bool Running => Transport.Running;
 
         public DnsEndPoint EndPoint => AsPeer is BoundPeer boundPeer ? boundPeer.EndPoint : null;
 
@@ -221,10 +221,10 @@ namespace Libplanet.Net
         /// <summary>
         /// Waits until this <see cref="Swarm{T}"/> instance gets started to run.
         /// </summary>
-        /// <seealso cref="NetMQTransport.WaitForRunningAsync()"/>
-        /// <returns>A <see cref="Task"/> completed when <see cref="NetMQTransport.Running"/>
+        /// <seealso cref="ITransport.WaitForRunningAsync()"/>
+        /// <returns>A <see cref="Task"/> completed when <see cref="ITransport.Running"/>
         /// property becomes <c>true</c>.</returns>
-        public Task WaitForRunningAsync() => (Transport as NetMQTransport)?.WaitForRunningAsync();
+        public Task WaitForRunningAsync() => Transport?.WaitForRunningAsync();
 
         public void Dispose()
         {

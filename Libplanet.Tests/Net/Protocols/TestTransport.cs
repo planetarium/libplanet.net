@@ -61,6 +61,7 @@ namespace Libplanet.Tests.Net.Protocols
             _random = new Random();
             Table = new RoutingTable(Address, tableSize, bucketSize);
             Protocol = new KademliaProtocol(Table, this, Address);
+            MessageHistory = new FixedSizedQueue<Message>(30);
         }
 
         public event EventHandler<Message> ProcessMessageHandler;
@@ -78,6 +79,8 @@ namespace Libplanet.Tests.Net.Protocols
         public DateTimeOffset? LastMessageTimestamp { get; private set; }
 
         public bool Running => !(_swarmCancellationTokenSource is null);
+
+        public ConcurrentQueue<Message> MessageHistory { get; }
 
         internal ConcurrentBag<Message> ReceivedMessages { get; }
 
@@ -117,6 +120,11 @@ namespace Libplanet.Tests.Net.Protocols
             _logger.Debug("Stopping transport of {Peer}.", AsPeer);
             _swarmCancellationTokenSource.Cancel();
             await Task.Delay(waitFor, cancellationToken);
+        }
+
+        public Task WaitForRunningAsync()
+        {
+            return Task.CompletedTask;
         }
 
         public async Task BootstrapAsync(
@@ -353,6 +361,7 @@ namespace Libplanet.Tests.Net.Protocols
                     message.Identity);
                 LastMessageTimestamp = DateTimeOffset.UtcNow;
                 ReceivedMessages.Add(reply);
+                MessageHistory.Enqueue(reply);
                 MessageReceived.Set();
                 return reply;
             }
@@ -433,6 +442,7 @@ namespace Libplanet.Tests.Net.Protocols
                 throw new ArgumentException("Sender of message is not a BoundPeer.");
             }
 
+            MessageHistory.Enqueue(message);
             if (message is TestMessage testMessage)
             {
                 if (_ignoreTestMessageWithData.Contains(testMessage.Data))

@@ -50,13 +50,11 @@ namespace Libplanet.Tests.Net.Transports
 
             try
             {
-                _ = transport.StartAsync();
-                await transport.WaitForRunningAsync();
+                await InitializeAsync(transport);
                 Assert.True(transport.Running);
                 await transport.StopAsync(TimeSpan.Zero);
                 Assert.False(transport.Running);
-                _ = transport.StartAsync();
-                await transport.WaitForRunningAsync();
+                await InitializeAsync(transport);
                 Assert.True(transport.Running);
             }
             finally
@@ -72,8 +70,7 @@ namespace Libplanet.Tests.Net.Transports
 
             try
             {
-                _ = transport.StartAsync();
-                await transport.WaitForRunningAsync();
+                await InitializeAsync(transport);
                 Assert.True(transport.Running);
                 transport.Dispose();
                 var boundPeer = new BoundPeer(
@@ -296,18 +293,12 @@ namespace Libplanet.Tests.Net.Transports
             }
         }
 
-        protected async Task<Task> InitializeAsync(
+        protected async Task InitializeAsync(
             ITransport transport,
             CancellationToken cts = default)
         {
-            Task task = transport.StartAsync(cts);
-
-            while (!transport.Running)
-            {
-                await Task.Delay(100, cts);
-            }
-
-            return task;
+            _ = transport.StartAsync(cts);
+            await transport.WaitForRunningAsync();
         }
 
         private ITransport CreateTransport(
