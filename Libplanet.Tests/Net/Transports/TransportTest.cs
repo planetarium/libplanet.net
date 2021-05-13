@@ -44,6 +44,76 @@ namespace Libplanet.Tests.Net.Transports
         }
 
         [SkippableFact(Timeout = Timeout)]
+        public async void RestartAsync()
+        {
+            ITransport transport = CreateTransport();
+
+            try
+            {
+                _ = transport.StartAsync();
+                await transport.WaitForRunningAsync();
+                Assert.True(transport.Running);
+                await transport.StopAsync(TimeSpan.Zero);
+                Assert.False(transport.Running);
+                _ = transport.StartAsync();
+                await transport.WaitForRunningAsync();
+                Assert.True(transport.Running);
+            }
+            finally
+            {
+                transport.Dispose();
+            }
+        }
+
+        [SkippableFact(Timeout = Timeout)]
+        public async void Dispose()
+        {
+            ITransport transport = CreateTransport();
+
+            try
+            {
+                _ = transport.StartAsync();
+                await transport.WaitForRunningAsync();
+                Assert.True(transport.Running);
+                transport.Dispose();
+                var boundPeer = new BoundPeer(
+                    new PrivateKey().PublicKey,
+                    new DnsEndPoint("localhost", 1234));
+                var message = new Ping();
+                await Assert.ThrowsAsync<ObjectDisposedException>(
+                    async () => await transport.StartAsync());
+                await Assert.ThrowsAsync<ObjectDisposedException>(
+                    async () => await transport.StopAsync(TimeSpan.Zero));
+                await Assert.ThrowsAsync<ObjectDisposedException>(
+                    async () => await transport.SendMessageAsync(boundPeer, message, default));
+                await Assert.ThrowsAsync<ObjectDisposedException>(
+                    async () => await transport.SendMessageWithReplyAsync(
+                        boundPeer,
+                        message,
+                        null,
+                        default));
+                await Assert.ThrowsAsync<ObjectDisposedException>(
+                    async () => await transport.SendMessageWithReplyAsync(
+                        boundPeer,
+                        message,
+                        null,
+                        3,
+                        default));
+                Assert.Throws<ObjectDisposedException>(
+                    () => transport.BroadcastMessage(null, message));
+                Assert.Throws<ObjectDisposedException>(
+                    () => transport.ReplyMessage(message));
+
+                // To check multiple Dispose() throws error or not.
+                transport.Dispose();
+            }
+            finally
+            {
+                transport.Dispose();
+            }
+        }
+
+        [SkippableFact(Timeout = Timeout)]
         public async Task AsPeer()
         {
             var privateKey = new PrivateKey();

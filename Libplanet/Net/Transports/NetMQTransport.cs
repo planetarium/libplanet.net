@@ -235,6 +235,11 @@ namespace Libplanet.Net.Transports
         /// <inheritdoc />
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(NetMQTransport));
+            }
+
             if (Running)
             {
                 throw new TransportException("Transport is already running.");
@@ -299,6 +304,11 @@ namespace Libplanet.Net.Transports
             CancellationToken cancellationToken = default
         )
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(NetMQTransport));
+            }
+
             if (Running)
             {
                 await Task.Delay(waitFor, cancellationToken);
@@ -393,6 +403,11 @@ namespace Libplanet.Net.Transports
             CancellationToken cancellationToken = default
         )
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(NetMQTransport));
+            }
+
             if (!(_turnClient is null) && _turnClient.BehindNAT)
             {
                 await CreatePermission(peer);
@@ -501,12 +516,22 @@ namespace Libplanet.Net.Transports
         /// <inheritdoc />
         public void BroadcastMessage(Address? except, Message message)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(NetMQTransport));
+            }
+
             _broadcastQueue.Enqueue((except, message));
         }
 
         /// <inheritdoc />
         public void ReplyMessage(Message message)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(NetMQTransport));
+            }
+
             string identityHex = ByteUtil.Hex(message.Identity);
             _logger.Debug("Reply {Message} to {Identity}...", message, identityHex);
             _replyQueue.Enqueue(message.ToNetMQMessage(
