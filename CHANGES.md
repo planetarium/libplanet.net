@@ -144,6 +144,14 @@ To be released.
      -  `Swarm<T>.PeerStates`
  -  Return type of `RoutingTable.Neighbors()` became `IReadOnlyList<BoundPeer>`
     (was `IEnumerable<BoundPeer>`).  [[#1230], [#1271]]
+ -  Removed `ITransport.RunAsync()` method.
+    `ITransport.StartAsync()` now conducts operation that
+    `ITransport.RunAsync()` used to conduct.  [[#1288]]
+ -  Removed `ITransport.ReplyMessage()` method which was non-blocking.
+    Instead, added `ITransport.ReplyMessageAsync()` asynchronous method
+    which is awaited until the reply message is sent.  [[#1288]]
+ -  The type of `ITransport.ProcessMessageHandler` became
+    `AsyncDelegate<T>` (which was `EventHandler`).  [[#1288]]
  -  All methods pertaining to evaluating `IAction`s are moved
     to a new `ActionEvaluator` class.  [[#1301], [#1305]]
      -  Removed `Block<T>.Evaluate()` method.
@@ -185,6 +193,14 @@ To be released.
  -  Added `StaticPeers` as the last parameter to
     `RoutingTable(Address, int, int)` constructor.  [[#1230], [#1271]]
  -  Added `AtomicActionRenderer<T>` class.  [[#1267], [#1275]]
+ -  Added `ITransport.MessageHistory` property.  [[#1288]]
+ -  Added `ITransport.WaitForRunning()` method.  [[#1288]]
+ -  Added `TcpTransport` class which implements `ITransport` interface.
+    [[#1288]]
+ -  Added `SwarmOptions.Type` property.  [[#1288]]
+ -  Added `SwarmOptions.TransportType` enum.  [[#1288]]
+ -  Added `AsyncDelegate<T>` class.  [[#1288]]
+ -  Added `InvalidMagicCookieException` class.  [[#1288]]
  -  Added `TxExecution` abstract class.  [[#1156], [#1289]]
  -  Added `TxSuccess` class.  [[#1156], [#1289]]
  -  Added `TxFailure` class.  [[#1156], [#1289]]
@@ -308,6 +324,7 @@ To be released.
 [#1284]: https://github.com/planetarium/libplanet/issues/1284
 [#1285]: https://github.com/planetarium/libplanet/issues/1285
 [#1287]: https://github.com/planetarium/libplanet/pull/1287
+[#1288]: https://github.com/planetarium/libplanet/pull/1288
 [#1289]: https://github.com/planetarium/libplanet/pull/1289
 [#1294]: https://github.com/planetarium/libplanet/issues/1294
 [#1298]: https://github.com/planetarium/libplanet/pull/1298
