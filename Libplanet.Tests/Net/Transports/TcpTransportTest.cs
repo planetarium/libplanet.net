@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using Libplanet.Crypto;
 using Libplanet.Net;
@@ -29,8 +30,72 @@ namespace Libplanet.Tests.Net.Transports
                 .Enrich.WithThreadId()
                 .WriteTo.TestOutput(testOutputHelper, outputTemplate: outputTemplate)
                 .CreateLogger()
-                .ForContext<TransportTest>();
-            Logger = Log.ForContext<TransportTest>();
+                .ForContext<TcpTransportTest>();
+            Logger = Log.ForContext<TcpTransportTest>();
+        }
+
+        [SkippableFact(Timeout = Timeout)]
+        public async Task ReadWriteMessageAsync()
+        {
+            var listener = new TcpListener(IPAddress.Any, 0);
+            listener.Start();
+            var client = new TcpClient();
+            await client.ConnectAsync("127.0.0.1", ((IPEndPoint)listener.LocalEndpoint).Port);
+            TcpClient listenerSocket = await listener.AcceptTcpClientAsync();
+
+            TcpTransport transport = CreateTcpTransport(
+                appProtocolVersion: AppProtocolVersion.Sign(new PrivateKey(), 1));
+            try
+            {
+                var message1 = new Ping
+                {
+                    Identity = Guid.NewGuid().ToByteArray(),
+                };
+
+                var message2 = new Pong
+                {
+                    Identity = Guid.NewGuid().ToByteArray(),
+                };
+
+                await transport.WriteMessageAsync(message1, client, default);
+                await transport.WriteMessageAsync(message2, client, default);
+                Message[] messages = new Message[2];
+                messages[0] = await transport.ReadMessageAsync(listenerSocket, default);
+                messages[1] = await transport.ReadMessageAsync(listenerSocket, default);
+                Assert.Equal(2, messages.Length);
+                Assert.Contains(messages, message => message is Ping);
+                Assert.Contains(messages, message => message is Pong);
+            }
+            finally
+            {
+                listenerSocket.Dispose();
+                client.Dispose();
+            }
+        }
+
+        [SkippableFact(Timeout = Timeout)]
+        public async Task ReadMessageCancelAsync()
+        {
+            var cts = new CancellationTokenSource();
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
+            var listener = new TcpListener(IPAddress.Any, 0);
+            listener.Start();
+            var client = new TcpClient();
+            await client.ConnectAsync("127.0.0.1", ((IPEndPoint)listener.LocalEndpoint).Port);
+            TcpClient listenerSocket = await listener.AcceptTcpClientAsync();
+
+            TcpTransport transport = CreateTcpTransport(
+                appProtocolVersion: AppProtocolVersion.Sign(new PrivateKey(), 1));
+            try
+            {
+                await Assert.ThrowsAsync<TaskCanceledException>(async () =>
+                    await transport.ReadMessageAsync(listenerSocket, cts.Token));
+            }
+            finally
+            {
+                listenerSocket.Dispose();
+                client.Dispose();
+            }
         }
 
         [SkippableFact(Timeout = Timeout)]
@@ -96,8 +161,6 @@ namespace Libplanet.Tests.Net.Transports
         {
             privateKey = privateKey ?? new PrivateKey();
             host = host ?? IPAddress.Loopback.ToString();
-            trustedAppProtocolVersionSigners = trustedAppProtocolVersionSigners ??
-                                               ImmutableHashSet<PublicKey>.Empty;
             iceServers = iceServers ?? new IceServer[] { };
             var table = new RoutingTable(privateKey.ToAddress(), tableSize, bucketSize);
 

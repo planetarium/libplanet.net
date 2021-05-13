@@ -50,8 +50,8 @@ namespace Libplanet.Tests.Net.Transports
                 .Enrich.WithThreadId()
                 .WriteTo.TestOutput(testOutputHelper, outputTemplate: outputTemplate)
                 .CreateLogger()
-                .ForContext<TransportTest>();
-            Logger = Log.ForContext<TransportTest>();
+                .ForContext<NetMQTransportTest>();
+            Logger = Log.ForContext<NetMQTransportTest>();
         }
 
         [SkippableFact(Timeout = Timeout, Skip = "Target method is broken.")]

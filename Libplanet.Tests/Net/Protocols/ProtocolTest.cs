@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Libplanet.Crypto;
 using Libplanet.Net;
 using Libplanet.Net.Protocols;
+using Libplanet.Net.Transports;
 using Serilog;
 using Xunit;
 using Xunit.Abstractions;
@@ -58,7 +59,7 @@ namespace Libplanet.Tests.Net.Protocols
             var transportA = CreateTestTransport();
             var transportB = CreateTestTransport();
 
-            Assert.Throws<SwarmException>(() => transportA.SendPing(transportB.AsPeer));
+            Assert.Throws<TransportException>(() => transportA.SendPing(transportB.AsPeer));
             await StartTestTransportAsync(transportA);
             await Assert.ThrowsAsync<TimeoutException>(() =>
                 transportA.AddPeersAsync(
@@ -148,9 +149,9 @@ namespace Libplanet.Tests.Net.Protocols
 
             Assert.Contains(transportB.AsPeer, transportA.Peers);
 
-            await transportA.StopAsync(TimeSpan.Zero);
-            await transportB.StopAsync(TimeSpan.Zero);
-            await transportC.StopAsync(TimeSpan.Zero);
+            transportA.Dispose();
+            transportB.Dispose();
+            transportC.Dispose();
         }
 
         [Fact(Timeout = Timeout)]
@@ -159,12 +160,15 @@ namespace Libplanet.Tests.Net.Protocols
             var transportA = CreateTestTransport();
             var transportB = CreateTestTransport();
 
-            await Assert.ThrowsAsync<SwarmException>(
+            await Assert.ThrowsAsync<TransportException>(
                 () => transportB.BootstrapAsync(
                     new[] { transportA.AsPeer },
                     TimeSpan.FromSeconds(3),
                     TimeSpan.FromSeconds(3))
             );
+
+            transportA.Dispose();
+            transportB.Dispose();
         }
 
         [Fact(Timeout = Timeout)]
@@ -198,9 +202,9 @@ namespace Libplanet.Tests.Net.Protocols
             }
             finally
             {
-                await transportA.StopAsync(TimeSpan.Zero);
-                await transportB.StopAsync(TimeSpan.Zero);
-                await transportC.StopAsync(TimeSpan.Zero);
+                transportA.Dispose();
+                transportB.Dispose();
+                transportC.Dispose();
             }
         }
 
@@ -220,7 +224,9 @@ namespace Libplanet.Tests.Net.Protocols
             await Task.Delay(100);
             await transportA.Protocol.RefreshTableAsync(TimeSpan.Zero, default(CancellationToken));
             Assert.Empty(transportA.Peers);
-            await transportA.StopAsync(TimeSpan.Zero);
+
+            transportA.Dispose();
+            transportB.Dispose();
         }
 
         [Fact(Timeout = Timeout)]
@@ -245,10 +251,10 @@ namespace Libplanet.Tests.Net.Protocols
             Assert.DoesNotContain(transportB.AsPeer, transport.Peers);
             Assert.DoesNotContain(transportC.AsPeer, transport.Peers);
 
-            await transport.StopAsync(TimeSpan.Zero);
-            await transportA.StopAsync(TimeSpan.Zero);
-            await transportB.StopAsync(TimeSpan.Zero);
-            await transportC.StopAsync(TimeSpan.Zero);
+            transport.Dispose();
+            transportA.Dispose();
+            transportB.Dispose();
+            transportC.Dispose();
         }
 
         [Fact(Timeout = Timeout)]
@@ -282,9 +288,10 @@ namespace Libplanet.Tests.Net.Protocols
             Assert.Contains(transportB.AsPeer, transport.Peers);
             Assert.DoesNotContain(transportC.AsPeer, transport.Peers);
 
-            await transport.StopAsync(TimeSpan.Zero);
-            await transportB.StopAsync(TimeSpan.Zero);
-            await transportC.StopAsync(TimeSpan.Zero);
+            transport.Dispose();
+            transportA.Dispose();
+            transportB.Dispose();
+            transportC.Dispose();
         }
 
         [Fact(Timeout = Timeout)]
@@ -319,8 +326,10 @@ namespace Libplanet.Tests.Net.Protocols
             Assert.DoesNotContain(transportB.AsPeer, transport.Peers);
             Assert.Contains(transportC.AsPeer, transport.Peers);
 
-            await transport.StopAsync(TimeSpan.Zero);
-            await transportC.StopAsync(TimeSpan.Zero);
+            transport.Dispose();
+            transportA.Dispose();
+            transportB.Dispose();
+            transportC.Dispose();
         }
 
         [Theory(Timeout = 2 * Timeout)]
@@ -358,10 +367,11 @@ namespace Libplanet.Tests.Net.Protocols
             }
             finally
             {
+                seed.Dispose();
                 foreach (var transport in transports)
                 {
                     Assert.True(transport.ReceivedTestMessageOfData("foo"));
-                    await transport.StopAsync(TimeSpan.Zero);
+                    transport.Dispose();
                 }
             }
         }
@@ -449,9 +459,9 @@ namespace Libplanet.Tests.Net.Protocols
             }
             finally
             {
-                await seed.StopAsync(TimeSpan.Zero);
-                await t1.StopAsync(TimeSpan.Zero);
-                await t2.StopAsync(TimeSpan.Zero);
+                seed.Dispose();
+                t1.Dispose();
+                t2.Dispose();
             }
         }
 
@@ -480,9 +490,9 @@ namespace Libplanet.Tests.Net.Protocols
             }
             finally
             {
-                await transportA.StopAsync(TimeSpan.Zero);
-                await transportB.StopAsync(TimeSpan.Zero);
-                await transportC.StopAsync(TimeSpan.Zero);
+                transportA.Dispose();
+                transportB.Dispose();
+                transportC.Dispose();
             }
         }
 
@@ -532,14 +542,12 @@ namespace Libplanet.Tests.Net.Protocols
             }
             finally
             {
-                await transport.StopAsync(TimeSpan.Zero);
+                transport.Dispose();
                 foreach (var t in transports)
                 {
-                    await t.StopAsync(TimeSpan.Zero);
+                    t.Dispose();
                 }
             }
-
-            Assert.True(true);
         }
 
         private TestTransport CreateTestTransport(
@@ -558,12 +566,12 @@ namespace Libplanet.Tests.Net.Protocols
                 networkDelay);
         }
 
-        private async Task<Task> StartTestTransportAsync(
+        private async Task StartTestTransportAsync(
             TestTransport transport,
             CancellationToken cancellationToken = default(CancellationToken))
         {
-            await transport.StartAsync(cancellationToken);
-            return transport.RunAsync(cancellationToken);
+            _ = transport.StartAsync(cancellationToken);
+            await transport.WaitForRunningAsync();
         }
     }
 }

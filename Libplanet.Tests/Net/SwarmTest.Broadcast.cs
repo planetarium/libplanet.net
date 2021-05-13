@@ -276,6 +276,8 @@ namespace Libplanet.Tests.Net
                 await StartAsync(swarmC);
 
                 await swarmC.AddPeersAsync(new[] { swarmA.AsPeer }, null);
+                Assert.Contains(swarmC.AsPeer, swarmA.Peers);
+                Assert.Contains(swarmA.AsPeer, swarmC.Peers);
 
                 for (var i = 0; i < 100; i++)
                 {

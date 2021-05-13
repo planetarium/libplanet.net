@@ -16,7 +16,8 @@ namespace Libplanet.Net.Transports
     public static class BoundPeerExtensions
     {
         /// <summary>
-        /// Queries <see cref="AppProtocolVersion"/> of given <see cref="BoundPeer"/>.
+        /// Queries <see cref="AppProtocolVersion"/> of given <see cref="BoundPeer"/>
+        /// specialized for NetMQ based transport.
         /// </summary>
         /// <param name="peer">The <see cref="BoundPeer"/> to query
         /// <see cref="AppProtocolVersion"/>.</param>
