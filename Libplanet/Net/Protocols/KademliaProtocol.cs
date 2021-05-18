@@ -703,7 +703,7 @@ namespace Libplanet.Net.Protocols
                 Identity = ping.Identity,
             };
 
-            _transport.ReplyMessage(pong);
+            _ = _transport.ReplyMessageAsync(pong, default);
         }
 
         /// <summary>
@@ -852,7 +852,7 @@ namespace Libplanet.Net.Protocols
                 Identity = findNeighbors.Identity,
             };
 
-            _transport.ReplyMessage(neighbors);
+            _ = _transport.ReplyMessageAsync(neighbors, default);
         }
     }
 }

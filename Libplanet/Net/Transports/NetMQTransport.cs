@@ -59,6 +59,7 @@ namespace Libplanet.Net.Transports
         private TaskCompletionSource<object> _runningEvent;
         private CancellationToken _cancellationToken;
         private ConcurrentDictionary<Address, DealerSocket> _dealers;
+        private ConcurrentDictionary<string, TaskCompletionSource<object>> _replyCompletionSources;
 
         private RoutingTable _table;
 
@@ -195,6 +196,8 @@ namespace Libplanet.Net.Transports
 
             MessageHistory = new FixedSizedQueue<Message>(MessageHistoryCapacity);
             _dealers = new ConcurrentDictionary<Address, DealerSocket>();
+            _replyCompletionSources =
+                new ConcurrentDictionary<string, TaskCompletionSource<object>>();
         }
 
         /// <inheritdoc />
@@ -521,7 +524,7 @@ namespace Libplanet.Net.Transports
         }
 
         /// <inheritdoc />
-        public void ReplyMessage(Message message)
+        public async Task ReplyMessageAsync(Message message, CancellationToken cancellationToken)
         {
             if (_disposed)
             {
@@ -529,12 +532,19 @@ namespace Libplanet.Net.Transports
             }
 
             string identityHex = ByteUtil.Hex(message.Identity);
+            var tcs = new TaskCompletionSource<object>();
+            using CancellationTokenRegistration ctr =
+                cancellationToken.Register(() => tcs.TrySetCanceled());
+            _replyCompletionSources.TryAdd(identityHex, tcs);
             _logger.Debug("Reply {Message} to {Identity}...", message, identityHex);
             _replyQueue.Enqueue(message.ToNetMQMessage(
                 _privateKey,
                 AsPeer,
                 DateTimeOffset.UtcNow,
                 _appProtocolVersion));
+
+            await tcs.Task;
+            _replyCompletionSources.TryRemove(identityHex, out _);
         }
 
         private void ReceiveMessage(object sender, NetMQSocketEventArgs e)
@@ -583,7 +593,7 @@ namespace Libplanet.Net.Transports
                 {
                     Identity = dapve.Identity,
                 };
-                ReplyMessage(differentVersion);
+                _ = ReplyMessageAsync(differentVersion, _cancellationToken);
                 _logger.Debug("Message from peer with different version received.");
             }
             catch (InvalidTimestampException ite)
@@ -680,6 +690,9 @@ namespace Libplanet.Net.Transports
             {
                 _logger.Debug("Failed to reply to {Identity}", identityHex);
             }
+
+            _replyCompletionSources.TryGetValue(identityHex, out TaskCompletionSource<object> tcs);
+            tcs?.TrySetResult(null);
         }
 
         private async Task RefreshPermissions(

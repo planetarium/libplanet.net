@@ -98,8 +98,8 @@ namespace Libplanet.Tests.Net.Transports
                         default));
                 Assert.Throws<ObjectDisposedException>(
                     () => transport.BroadcastMessage(null, message));
-                Assert.Throws<ObjectDisposedException>(
-                    () => transport.ReplyMessage(message));
+                await Assert.ThrowsAsync<ObjectDisposedException>(
+                    async () => await transport.ReplyMessageAsync(message, default));
 
                 // To check multiple Dispose() throws error or not.
                 transport.Dispose();
@@ -187,7 +187,7 @@ namespace Libplanet.Tests.Net.Transports
             }
         }
 
-        // This also tests ITransport.ReplyMessage at the same time.
+        // This also tests ITransport.ReplyMessageAsync at the same time.
         [SkippableFact(Timeout = Timeout)]
         public async Task SendMessageWithReplyAsync()
         {
@@ -198,10 +198,12 @@ namespace Libplanet.Tests.Net.Transports
             {
                 if (message is Ping)
                 {
-                    transportB.ReplyMessage(new Pong
-                    {
-                        Identity = message.Identity,
-                    });
+                    _ = transportB.ReplyMessageAsync(
+                        new Pong
+                        {
+                            Identity = message.Identity,
+                        },
+                        CancellationToken.None);
                 }
             };
 

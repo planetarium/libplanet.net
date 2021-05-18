@@ -142,6 +142,10 @@ namespace Libplanet.Net.Transports
         /// <paramref name="message"/>.
         /// </remarks>
         /// <param name="message">A <see cref="Message"/> to reply.</param>
-        void ReplyMessage(Message message);
+        /// <param name="cancellationToken">
+        /// A cancellation token used to propagate notification that this
+        /// operation should be canceled.</param>
+        /// <returns>An awaitable task without value.</returns>
+        Task ReplyMessageAsync(Message message, CancellationToken cancellationToken);
     }
 }

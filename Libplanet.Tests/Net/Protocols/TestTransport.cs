@@ -388,7 +388,7 @@ namespace Libplanet.Tests.Net.Protocols
             };
         }
 
-        public void ReplyMessage(Message message)
+        public async Task ReplyMessageAsync(Message message, CancellationToken cancellationToken)
         {
             if (!Running)
             {
@@ -397,12 +397,9 @@ namespace Libplanet.Tests.Net.Protocols
 
             _logger.Debug("Replying {Message}...", message);
             message.Remote = AsPeer;
-            Task.Run(async () =>
-            {
-                await Task.Delay(_networkDelay);
-                _transports[_peersToReply[message.Identity]].ReceiveReply(message);
-                _peersToReply.TryRemove(message.Identity, out Address addr);
-            });
+            await Task.Delay(_networkDelay, cancellationToken);
+            _transports[_peersToReply[message.Identity]].ReceiveReply(message);
+            _peersToReply.TryRemove(message.Identity, out Address addr);
         }
 
         public async Task WaitForTestMessageWithData(
@@ -467,11 +464,13 @@ namespace Libplanet.Tests.Net.Protocols
 
             if (message is Ping)
             {
-                ReplyMessage(new Pong
-                {
-                    Identity = message.Identity,
-                    Remote = AsPeer,
-                });
+                _ = ReplyMessageAsync(
+                    new Pong
+                    {
+                        Identity = message.Identity,
+                        Remote = AsPeer,
+                    },
+                    default);
             }
 
             LastMessageTimestamp = DateTimeOffset.UtcNow;
