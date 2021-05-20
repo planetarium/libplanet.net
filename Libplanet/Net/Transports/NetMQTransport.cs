@@ -195,13 +195,14 @@ namespace Libplanet.Net.Transports
             );
 
             MessageHistory = new FixedSizedQueue<Message>(MessageHistoryCapacity);
+            ProcessMessageHandler = new AsyncDelegate<Message>();
             _dealers = new ConcurrentDictionary<Address, DealerSocket>();
             _replyCompletionSources =
                 new ConcurrentDictionary<string, TaskCompletionSource<object>>();
         }
 
         /// <inheritdoc />
-        public event EventHandler<Message> ProcessMessageHandler;
+        public AsyncDelegate<Message> ProcessMessageHandler { get; }
 
         /// <inheritdoc cref="ITransport.AsPeer"/>
         public Peer AsPeer => EndPoint is null
@@ -576,7 +577,7 @@ namespace Libplanet.Net.Transports
 
                 try
                 {
-                    ProcessMessageHandler?.Invoke(this, message);
+                    _ = ProcessMessageHandler.InvokeAsync(message);
                 }
                 catch (Exception exc)
                 {

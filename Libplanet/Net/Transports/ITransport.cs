@@ -15,11 +15,11 @@ namespace Libplanet.Net.Transports
     public interface ITransport : IDisposable
     {
         /// <summary>
-        /// The <see cref="EventHandler"/> invoked when a message that is not
+        /// The list of tasks invoked when a message that is not
         /// a reply is received. To handle reply, please use <see cref=
         /// "SendMessageWithReplyAsync(BoundPeer,Message,TimeSpan?,CancellationToken)"/>.
         /// </summary>
-        event EventHandler<Message> ProcessMessageHandler;
+        AsyncDelegate<Message> ProcessMessageHandler { get; }
 
         /// <summary>
         /// <see cref="Peer"/> representation of <see cref="ITransport"/>.

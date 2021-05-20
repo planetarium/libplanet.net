@@ -164,10 +164,11 @@ namespace Libplanet.Tests.Net.Transports
 
             TaskCompletionSource<Message> tcs = new TaskCompletionSource<Message>();
 
-            transportB.ProcessMessageHandler += (sender, message) =>
+            transportB.ProcessMessageHandler.Register(async message =>
             {
                 tcs.SetResult(message);
-            };
+                await Task.Yield();
+            });
 
             try
             {
@@ -200,18 +201,18 @@ namespace Libplanet.Tests.Net.Transports
             ITransport transportA = CreateTransport();
             ITransport transportB = CreateTransport();
 
-            transportB.ProcessMessageHandler += (sender, message) =>
+            transportB.ProcessMessageHandler.Register(async message =>
             {
                 if (message is Ping)
                 {
-                    _ = transportB.ReplyMessageAsync(
+                    await transportB.ReplyMessageAsync(
                         new Pong
                         {
                             Identity = message.Identity,
                         },
                         CancellationToken.None);
                 }
-            };
+            });
 
             try
             {
@@ -267,24 +268,24 @@ namespace Libplanet.Tests.Net.Transports
             ITransport transportA = CreateTransport();
             ITransport transportB = CreateTransport();
 
-            transportB.ProcessMessageHandler += (sender, message) =>
+            transportB.ProcessMessageHandler.Register(async message =>
             {
                 if (message is Ping)
                 {
-                    _ = transportB.ReplyMessageAsync(
+                    await transportB.ReplyMessageAsync(
                         new Ping
                         {
                             Identity = message.Identity,
                         },
                         default);
-                    _ = transportB.ReplyMessageAsync(
+                    await transportB.ReplyMessageAsync(
                         new Pong
                         {
                             Identity = message.Identity,
                         },
                         default);
                 }
-            };
+            });
 
             try
             {
@@ -378,18 +379,20 @@ namespace Libplanet.Tests.Net.Transports
             var tcsC = new TaskCompletionSource<Message>();
             var tcsD = new TaskCompletionSource<Message>();
 
-            transportB.ProcessMessageHandler += MessageHandler(tcsB);
-            transportC.ProcessMessageHandler += MessageHandler(tcsC);
-            transportD.ProcessMessageHandler += MessageHandler(tcsD);
+            transportB.ProcessMessageHandler.Register(MessageHandler(tcsB));
+            transportC.ProcessMessageHandler.Register(MessageHandler(tcsC));
+            transportD.ProcessMessageHandler.Register(MessageHandler(tcsD));
 
-            EventHandler<Message> MessageHandler(TaskCompletionSource<Message> tcs)
+            Func<Message, Task> MessageHandler(TaskCompletionSource<Message> tcs)
             {
-                return (sender, message) =>
+                return async message =>
                 {
                     if (message is Ping)
                     {
                         tcs.SetResult(message);
                     }
+
+                    await Task.Yield();
                 };
             }
 

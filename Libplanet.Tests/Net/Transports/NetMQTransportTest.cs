@@ -61,10 +61,11 @@ namespace Libplanet.Tests.Net.Transports
             var transportB = CreateNetMQTransport();
 
             var messageReceived = new AsyncAutoResetEvent();
-            transportB.ProcessMessageHandler += (sender, message) =>
+            transportB.ProcessMessageHandler.Register(async message =>
             {
                 messageReceived.Set();
-            };
+                await Task.Yield();
+            });
 
             try
             {

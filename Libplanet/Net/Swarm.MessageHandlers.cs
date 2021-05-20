@@ -13,7 +13,7 @@ namespace Libplanet.Net
 {
     public partial class Swarm<T>
     {
-        private void ProcessMessageHandler(object target, Message message)
+        private async Task ProcessMessageHandlerAsync(Message message)
         {
             switch (message)
             {
@@ -38,7 +38,7 @@ namespace Libplanet.Net
                         Identity = getChainStatus.Identity,
                     };
 
-                    _ = Transport.ReplyMessageAsync(chainStatus, default);
+                    await Transport.ReplyMessageAsync(chainStatus, default);
                     break;
                 }
 
@@ -65,16 +65,16 @@ namespace Libplanet.Net
                     {
                         Identity = getBlockHashes.Identity,
                     };
-                    _ = Transport.ReplyMessageAsync(reply, default);
+                    await Transport.ReplyMessageAsync(reply, default);
                     break;
                 }
 
                 case GetBlocks getBlocks:
-                    TransferBlocks(getBlocks);
+                    await TransferBlocksAsync(getBlocks);
                     break;
 
                 case GetTxs getTxs:
-                    TransferTxs(getTxs);
+                    await TransferTxsAsync(getTxs);
                     break;
 
                 case TxIds txIds:
@@ -86,10 +86,7 @@ namespace Libplanet.Net
                     break;
 
                 case BlockHeaderMessage blockHeader:
-                    Task.Run(
-                        async () => await ProcessBlockHeader(blockHeader, _cancellationToken),
-                        _cancellationToken
-                    );
+                    await ProcessBlockHeader(blockHeader, _cancellationToken);
                     break;
 
                 default:
@@ -173,7 +170,7 @@ namespace Libplanet.Net
             }
         }
 
-        private void TransferTxs(GetTxs getTxs)
+        private async Task TransferTxsAsync(GetTxs getTxs)
         {
             foreach (TxId txid in getTxs.TxIds)
             {
@@ -188,7 +185,7 @@ namespace Libplanet.Net
                 {
                     Identity = getTxs.Identity,
                 };
-                _ = Transport.ReplyMessageAsync(response, default);
+                await Transport.ReplyMessageAsync(response, default);
             }
         }
 
@@ -231,7 +228,7 @@ namespace Libplanet.Net
             }
         }
 
-        private void TransferBlocks(GetBlocks getData)
+        private async Task TransferBlocksAsync(GetBlocks getData)
         {
             string identityHex = ByteUtil.Hex(getData.Identity);
             _logger.Verbose(
@@ -268,7 +265,7 @@ namespace Libplanet.Net
                         i,
                         total
                     );
-                    _ = Transport.ReplyMessageAsync(response, default);
+                    await Transport.ReplyMessageAsync(response, default);
                     blocks.Clear();
                 }
 
@@ -287,7 +284,7 @@ namespace Libplanet.Net
                     total,
                     identityHex
                 );
-                _ = Transport.ReplyMessageAsync(response, default);
+                await Transport.ReplyMessageAsync(response, default);
             }
 
             _logger.Debug("Blocks were transferred to {Identity}.", identityHex);

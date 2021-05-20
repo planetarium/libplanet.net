@@ -57,7 +57,7 @@ namespace Libplanet.Net.Protocols
             _requestTimeout =
                 requestTimeout ??
                 TimeSpan.FromMilliseconds(5000);
-            _transport.ProcessMessageHandler += ProcessMessageHandler;
+            _transport.ProcessMessageHandler.Register(ProcessMessageHandler);
         }
 
         /// <inheritdoc />
@@ -488,19 +488,19 @@ namespace Libplanet.Net.Protocols
             }
         }
 
-        private void ProcessMessageHandler(object target, Message message)
+        private async Task ProcessMessageHandler(Message message)
         {
             switch (message)
             {
                 case Ping ping:
                 {
-                    ReceivePing(ping);
+                    await ReceivePingAsync(ping);
                     break;
                 }
 
                 case FindNeighbors findPeer:
                 {
-                    ReceiveFindPeer(findPeer);
+                    await ReceiveFindPeerAsync(findPeer);
                     break;
                 }
             }
@@ -690,7 +690,7 @@ namespace Libplanet.Net.Protocols
         }
 
         // Send pong back to remote
-        private void ReceivePing(Ping ping)
+        private async Task ReceivePingAsync(Ping ping)
         {
             if (ping.Remote.Address.Equals(_address))
             {
@@ -703,7 +703,7 @@ namespace Libplanet.Net.Protocols
                 Identity = ping.Identity,
             };
 
-            _ = _transport.ReplyMessageAsync(pong, default);
+            await _transport.ReplyMessageAsync(pong, default);
         }
 
         /// <summary>
@@ -842,7 +842,7 @@ namespace Libplanet.Net.Protocols
 
         // FIXME: this method is not safe from amplification attack
         // maybe ping/pong/ping/pong is required
-        private void ReceiveFindPeer(FindNeighbors findNeighbors)
+        private async Task ReceiveFindPeerAsync(FindNeighbors findNeighbors)
         {
             IEnumerable<BoundPeer> found =
                 _table.Neighbors(findNeighbors.Target, _table.BucketSize, true);
@@ -852,7 +852,7 @@ namespace Libplanet.Net.Protocols
                 Identity = findNeighbors.Identity,
             };
 
-            _ = _transport.ReplyMessageAsync(neighbors, default);
+            await _transport.ReplyMessageAsync(neighbors, default);
         }
     }
 }
