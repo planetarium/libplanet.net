@@ -364,6 +364,38 @@ namespace Libplanet.Tests.Net.Transports
         }
 
         [SkippableFact(Timeout = Timeout)]
+        public async Task SendMessageAsyncCancelWhenTransportStop()
+        {
+            ITransport transportA = CreateTransport();
+            ITransport transportB = CreateTransport();
+
+            try
+            {
+                await InitializeAsync(transportA);
+                await InitializeAsync(transportB);
+
+                Task t = transportA.SendMessageWithReplyAsync(
+                        (BoundPeer)transportB.AsPeer,
+                        new Ping(),
+                        null,
+                        CancellationToken.None);
+
+                // For context change
+                await Task.Delay(100);
+
+                await transportA.StopAsync(TimeSpan.Zero);
+                Assert.False(transportA.Running);
+                await Assert.ThrowsAsync<TaskCanceledException>(async () => await t);
+                Assert.True(t.IsCanceled);
+            }
+            finally
+            {
+                transportA.Dispose();
+                transportB.Dispose();
+            }
+        }
+
+        [SkippableFact(Timeout = Timeout)]
         public async Task BroadcastMessage()
         {
             var address = new PrivateKey().ToAddress();

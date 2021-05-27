@@ -46,13 +46,11 @@ namespace Libplanet.Net.Transports
         private readonly ILogger _logger;
         private readonly TimeSpan? _messageLifespan;
 
-        private readonly CancellationTokenSource _turnCancellationTokenSource;
-
         private readonly ConcurrentDictionary<Guid, ReplyStream> _streams;
 
         private TaskCompletionSource<object> _runningEvent;
         private CancellationTokenSource _runtimeCancellationTokenSource;
-        private CancellationToken _cancellationToken;
+        private CancellationTokenSource _turnCancellationTokenSource;
 
         private int _listenPort;
         private DnsEndPoint? _hostEndPoint;
@@ -175,18 +173,18 @@ namespace Libplanet.Net.Transports
             _listenPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
 
             _logger.Information("Listen on {Port}", _listenPort);
+            _runtimeCancellationTokenSource =
+                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _turnCancellationTokenSource =
+                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
             if (_host is null && !(_iceServers is null))
             {
                 _turnClient = await IceServer.CreateTurnClient(_iceServers);
                 await _turnClient.StartAsync(_listenPort, cancellationToken);
 
-                _ = RefreshPermissions(cancellationToken);
+                _ = RefreshPermissions(_runtimeCancellationTokenSource.Token);
             }
-
-            _runtimeCancellationTokenSource =
-                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            _cancellationToken = _runtimeCancellationTokenSource.Token;
 
             if (_turnClient is null || !_turnClient.BehindNAT)
             {
@@ -201,8 +199,8 @@ namespace Libplanet.Net.Transports
 
             List<Task> tasks = new List<Task>();
 
-            tasks.Add(ReceiveMessageAsync(_cancellationToken));
-            tasks.Add(ProcessRuntime(_cancellationToken));
+            tasks.Add(ReceiveMessageAsync(_runtimeCancellationTokenSource.Token));
+            tasks.Add(ProcessRuntime(_runtimeCancellationTokenSource.Token));
 
             Running = true;
             _logger.Debug("Start to run. TurnClient: {Client}", _turnClient);
@@ -222,7 +220,6 @@ namespace Libplanet.Net.Transports
                 await Task.Delay(waitFor, cancellationToken);
                 _listener?.Stop();
                 _runtimeCancellationTokenSource.Cancel();
-                _turnCancellationTokenSource.Cancel();
                 StopAllStreams();
                 Running = false;
             }
@@ -296,12 +293,19 @@ namespace Libplanet.Net.Transports
                 expectedResponses
             );
 
-            using var client = new TcpClient { LingerState = new LingerOption(true, 1) };
+            using CancellationTokenSource linkedTokenSource =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    _runtimeCancellationTokenSource.Token);
+            var client = new TcpClient { LingerState = new LingerOption(true, 1) };
             try
             {
                 await client.ConnectAsync(peer.EndPoint.Host, peer.EndPoint.Port);
+                _logger.Debug(
+                    "SendMessageAsync client: {EndPoint}",
+                    (IPEndPoint)client.Client.LocalEndPoint);
                 client.ReceiveTimeout = timeout?.Milliseconds ?? 0;
-                await WriteMessageAsync(message, client, cancellationToken);
+                await WriteMessageAsync(message, client, linkedTokenSource.Token);
                 _logger.Verbose(
                     "Successfully sent request {RequestId} to {Peer}: {Message}.",
                     reqId,
@@ -317,18 +321,17 @@ namespace Libplanet.Net.Transports
                         (int)timeout.Value.TotalMilliseconds * expectedResponses);
                 }
 
-                using CancellationTokenSource linkedTcs =
+                using CancellationTokenSource timeoutTokenSource =
                     CancellationTokenSource.CreateLinkedTokenSource(
                         timeoutCts.Token,
-                        cancellationToken);
+                        linkedTokenSource.Token);
                 while (expectedResponses > 0)
                 {
                     try
                     {
-                        // TODO: Should consider case where stream bytes exceeds buffer size.
                         Message received = await ReadMessageAsync(
                             client,
-                            linkedTcs.Token);
+                            timeoutTokenSource.Token);
                         _logger.Verbose(
                             "Received message was {Message}. Total: {Count}",
                             received,
@@ -413,6 +416,23 @@ namespace Libplanet.Net.Transports
                     e.Actual);
                 throw;
             }
+            finally
+            {
+                _ = Task.Run(
+                    async () =>
+                    {
+                        try
+                        {
+                            // Wait 15 seconds to close client to receive ACK from TURN.
+                            await Task.Delay(15 * 1000, _runtimeCancellationTokenSource.Token);
+                        }
+                        finally
+                        {
+                            client.Dispose();
+                        }
+                    },
+                    _runtimeCancellationTokenSource.Token);
+            }
         }
 
         public void BroadcastMessage(Address? except, Message message)
@@ -424,7 +444,7 @@ namespace Libplanet.Net.Transports
 
             foreach (var peer in _table.PeersToBroadcast(except))
             {
-                _ = SendMessageAsync(peer, message, _cancellationToken);
+                _ = SendMessageAsync(peer, message, _runtimeCancellationTokenSource.Token);
             }
         }
 
@@ -436,6 +456,10 @@ namespace Libplanet.Net.Transports
             }
 
             var id = new Guid(message.Identity);
+            using CancellationTokenSource linkedTokenSource =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken,
+                    _runtimeCancellationTokenSource.Token);
             _logger.Verbose("Trying to reply message. ID: {Id}", id);
             if (_streams.TryGetValue(id, out ReplyStream stream))
             {
@@ -444,12 +468,12 @@ namespace Libplanet.Net.Transports
                 {
                     _logger.Verbose("Start to writing reply {Message}.", message);
                     using var @lock = stream.Lock.Lock();
-                    await WriteMessageAsync(message, stream.Client, _cancellationToken);
+                    await WriteMessageAsync(message, stream.Client, linkedTokenSource.Token);
                 }
                 catch (IOException)
                 {
                     _logger.Verbose("Connection is lost");
-                    _ = TryRemoveStreamAsync(id, _cancellationToken);
+                    _ = TryRemoveStreamAsync(id, _runtimeCancellationTokenSource.Token);
                 }
             }
         }
@@ -459,6 +483,11 @@ namespace Libplanet.Net.Transports
             TcpClient client,
             CancellationToken cancellationToken)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw new TaskCanceledException();
+            }
+
             byte[] serialized = message.Serialize(
                 _privateKey,
                 AsPeer,
@@ -495,6 +524,11 @@ namespace Libplanet.Net.Transports
             TcpClient client,
             CancellationToken cancellationToken)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw new TaskCanceledException();
+            }
+
             var content = new List<byte>();
             byte[] buffer = new byte[1000];
             NetworkStream stream = client.GetStream();
@@ -536,7 +570,7 @@ namespace Libplanet.Net.Transports
 
                     throw;
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
                     if (cancellationToken.IsCancellationRequested)
                     {
@@ -575,7 +609,9 @@ namespace Libplanet.Net.Transports
                 {
                     TcpClient client = await _listener.AcceptTcpClientAsync();
                     client.LingerState = new LingerOption(true, 1);
-                    _logger.Verbose("Connected to tcp client.");
+                    _logger.Verbose(
+                        "Connected to tcp client {Address}.",
+                        (IPEndPoint)client.Client.RemoteEndPoint);
                     Guid guid = Guid.NewGuid();
                     _logger.Verbose("Start to accept message of {Id}.", guid);
 
@@ -659,8 +695,7 @@ namespace Libplanet.Net.Transports
             }
         }
 
-        private async Task RefreshPermissions(
-            CancellationToken cancellationToken)
+        private async Task RefreshPermissions(CancellationToken cancellationToken)
         {
             TimeSpan lifetime = TurnPermissionLifetime;
             while (!cancellationToken.IsCancellationRequested)
