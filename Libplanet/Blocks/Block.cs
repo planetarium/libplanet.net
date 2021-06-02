@@ -583,34 +583,19 @@ namespace Libplanet.Blocks
         {
             // As the order of transactions should be unpredictable until a block is mined,
             // the sorter key should be derived from both a block hash and a txid.
-            var hashInteger = new BigInteger(preEvaluationHash.ToByteArray());
+            var maskInteger = new BigInteger(preEvaluationHash.ToByteArray());
 
-            // If there are multiple transactions for the same signer these should be ordered by
-            // their tx nonces.  So transactions of the same signer should have the same sort key.
-            // The following logic "flattens" multiple tx ids having the same signer into a single
-            // txid by applying XOR between them.
-            IImmutableDictionary<Address, IImmutableSet<Transaction<T>>> signerTxs = txs
+            // Transactions with the same signers are grouped first and the ordering of the groups
+            // is determined by the XOR aggregate of the txid's in the group with XOR bitmask
+            // applied using the pre-evaluation hash provided.  Then within each group,
+            // transactions are ordered by nonce.
+            return txs
                 .GroupBy(tx => tx.Signer)
-                .ToImmutableDictionary(
-                    g => g.Key,
-                    g => (IImmutableSet<Transaction<T>>)g.ToImmutableHashSet());
-            IImmutableDictionary<Address, BigInteger> signerTxIds = signerTxs
-                .ToImmutableDictionary(
-                    pair => pair.Key,
-                    pair => pair.Value
+                .OrderBy(
+                    group => maskInteger ^ group
                         .Select(tx => new BigInteger(tx.Id.ToByteArray()))
-                        .OrderBy(txid => txid)
-                        .Aggregate((a, b) => a ^ b));
-
-            // Order signers by values derivied from both block hash and their "flatten" txid:
-            IImmutableList<Address> signers = signerTxIds
-                .OrderBy(pair => pair.Value ^ hashInteger)
-                .Select(pair => pair.Key)
-                .ToImmutableArray();
-
-            // Order transactions for each signer by their tx nonces:
-            return signers
-                .SelectMany(signer => signerTxs[signer].OrderBy(tx => tx.Nonce));
+                        .Aggregate((first, second) => first ^ second))
+                .SelectMany(group => group.OrderBy(tx => tx.Nonce));
         }
 
         private static IEnumerable<Transaction<T>> OrderTxsForEvaluationV2(
