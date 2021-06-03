@@ -15,8 +15,10 @@ namespace Libplanet.Tests.Net.Transports
 {
     public class BoundPeerExtensionsTest
     {
-        [Fact(Timeout = 60 * 1000)]
-        public async Task QueryAppProtocolVersion()
+        [Theory(Timeout = 60 * 1000)]
+        [InlineData(SwarmOptions.TransportType.NetMQTransport)]
+        [InlineData(SwarmOptions.TransportType.TcpTransport)]
+        public async Task QueryAppProtocolVersion(SwarmOptions.TransportType transportType)
         {
             var fx = new DefaultStoreFixture();
             var policy = new BlockPolicy<DumbAction>();
@@ -28,12 +30,18 @@ namespace Libplanet.Tests.Net.Transports
             string host = IPAddress.Loopback.ToString();
             int port = FreeTcpPort();
 
+            var option = new SwarmOptions
+            {
+                Type = transportType,
+            };
+
             using (var swarm = new Swarm<DumbAction>(
                 blockchain,
                 swarmKey,
                 apv,
                 host: host,
-                listenPort: port))
+                listenPort: port,
+                options: option))
             {
                 var peer = new BoundPeer(swarmKey.PublicKey, new DnsEndPoint(host, port));
                 // Before swarm starting...

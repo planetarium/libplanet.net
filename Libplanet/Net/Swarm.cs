@@ -137,17 +137,12 @@ namespace Libplanet.Net
 
             Options = options ?? new SwarmOptions();
             RoutingTable = new RoutingTable(Address, tableSize, bucketSize, Options.StaticPeers);
-            Transport = new NetMQTransport(
-                RoutingTable,
-                _privateKey,
-                _appProtocolVersion,
-                TrustedAppProtocolVersionSigners,
+            Transport = InitializeTransport(
                 workers,
                 host,
                 listenPort,
                 iceServers,
-                differentAppProtocolVersionEncountered,
-                Options.MessageLifespan);
+                differentAppProtocolVersionEncountered);
             Transport.ProcessMessageHandler.Register(ProcessMessageHandlerAsync);
             PeerDiscovery = new KademliaProtocol(RoutingTable, Transport, Address);
         }
@@ -1286,6 +1281,45 @@ namespace Libplanet.Net
                     "Failed to fetch demand block hashes from {Peer}; " +
                     "retry with another peer...\n";
                 _logger.Debug(error, message, peer, error);
+            }
+        }
+
+        private ITransport InitializeTransport(
+            int workers,
+            string host,
+            int? listenPort,
+            IEnumerable<IceServer> iceServers,
+            DifferentAppProtocolVersionEncountered differentAppProtocolVersionEncountered)
+        {
+            switch (Options.Type)
+            {
+                case SwarmOptions.TransportType.NetMQTransport:
+                    return new NetMQTransport(
+                        RoutingTable,
+                        _privateKey,
+                        _appProtocolVersion,
+                        TrustedAppProtocolVersionSigners,
+                        workers,
+                        host,
+                        listenPort,
+                        iceServers ?? new IceServer[0],
+                        differentAppProtocolVersionEncountered,
+                        Options.MessageLifespan);
+
+                case SwarmOptions.TransportType.TcpTransport:
+                    return new TcpTransport(
+                        RoutingTable,
+                        _privateKey,
+                        _appProtocolVersion,
+                        TrustedAppProtocolVersionSigners,
+                        host,
+                        listenPort,
+                        iceServers ?? new IceServer[0],
+                        differentAppProtocolVersionEncountered,
+                        Options.MessageLifespan);
+
+                default:
+                    throw new ArgumentException(nameof(SwarmOptions.Type));
             }
         }
 
