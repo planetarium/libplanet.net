@@ -71,6 +71,12 @@ namespace Libplanet.Blocks
             HashDigest<SHA256>? stateRootHash = null,
             int protocolVersion = CurrentProtocolVersion)
         {
+            if (preEvaluationHash is null && !(stateRootHash is null))
+            {
+                throw new ArgumentException(
+                    "If preEvaluationHash is null, stateRootHash must also be null.");
+            }
+
             ProtocolVersion = protocolVersion;
             Index = index;
             Difficulty = difficulty;
@@ -82,11 +88,19 @@ namespace Libplanet.Blocks
             Transactions = transactions.OrderBy(tx => tx.Id).ToArray();
             TxHash = CalculateTxHashes(Transactions);
 
-            PreEvaluationHash = preEvaluationHash ?? Hashcash.Hash(Header.SerializeForHash());
-            StateRootHash = stateRootHash;
-
-            // FIXME: This does not need to be computed every time?
-            Hash = Hashcash.Hash(Header.SerializeForHash());
+            if (preEvaluationHash is { } preEvaluationBlockHash)
+            {
+                PreEvaluationHash = preEvaluationBlockHash;
+                StateRootHash = stateRootHash;
+                Hash = Hashcash.Hash(Header.SerializeForHash());
+            }
+            else
+            {
+                // FIXME: This only works due to sanity constraint on usage.
+                PreEvaluationHash = Hashcash.Hash(Header.SerializeForPreEvaluationHash());
+                StateRootHash = stateRootHash;
+                Hash = PreEvaluationHash;
+            }
 
             // As the order of transactions should be unpredictable until a block is mined,
             // the sorter key should be derived from both a block hash and a txid.
@@ -221,6 +235,7 @@ namespace Libplanet.Blocks
             // FIXME: we should convert `StateRootHash`'s type to `HashDisgest<SHA256>` after
             // removing `IBlockStateStore`.
             StateRootHash = stateRootHash;
+
             TxHash = txHash;
             Transactions = transactions.ToImmutableArray();
         }
