@@ -48,29 +48,29 @@ namespace Libplanet.Blocks
         private static readonly Codec Codec = new Codec();
 
         /// <summary>
-        /// Creates a <see cref="BlockHeader"/> instance.
+        /// Creates a <see cref="BlockHeader"/> instance by manually filling in all the properties.
         /// </summary>
-        /// <param name="protocolVersion">The protocol version.  Goes to the <see
-        /// cref="ProtocolVersion"/>.</param>
-        /// <param name="index">The height of the block.  Goes to the <see cref="Index"/>.
+        /// <param name="protocolVersion">The protocol version.  Goes to
+        /// <see cref="ProtocolVersion"/>.</param>
+        /// <param name="index">The height of the block.  Goes to <see cref="Index"/>.
         /// </param>
         /// <param name="timestamp">The time this block is created.
-        /// Goes to the <see cref="Timestamp"/>.</param>
+        /// Goes to <see cref="Timestamp"/>.</param>
         /// <param name="nonce">The nonce which satisfy the given <paramref name="difficulty"/>
-        /// with any other field values.  Goes to the <see cref="Nonce"/>.</param>
+        /// with any other field values.  Goes to <see cref="Nonce"/>.</param>
         /// <param name="miner">An optional address refers to who mines this block.
-        /// Goes to the <see cref="Miner"/>.</param>
+        /// Goes to <see cref="Miner"/>.</param>
         /// <param name="difficulty">The mining difficulty that <paramref name="nonce"/>
-        /// has to satisfy.  Goes to the <see cref="Difficulty"/>.</param>
+        /// has to satisfy.  Goes to <see cref="Difficulty"/>.</param>
         /// <param name="totalDifficulty">The total mining difficulty until this block.
         /// See also <see cref="Difficulty"/>.</param>
         /// <param name="previousHash">The previous block's <see cref="Hash"/>.  If it's a genesis
         /// block (i.e., <paramref name="index"/> is 0) this should be <c>null</c>.
-        /// Goes to the <see cref="PreviousHash"/>.</param>
+        /// Goes to <see cref="PreviousHash"/>.</param>
         /// <param name="txHash">The result of hashing the transactions the block has.
-        /// Goes to the <see cref="TxHash"/>.</param>
+        /// Goes to <see cref="TxHash"/>.</param>
         /// <param name="hash">The hash of the <see cref="Block{T}"/>.
-        /// Goes to the <see cref="Hash"/>.</param>
+        /// Goes to <see cref="Hash"/>.</param>
         /// <param name="preEvaluationHash">The hash derived from the block <em>except of</em>
         /// <paramref name="stateRootHash"/> (i.e., without action evaluation).
         /// Used for <see cref="Validate"/> checking <paramref name="nonce"/>.
@@ -103,6 +103,69 @@ namespace Libplanet.Blocks
             Hash = hash;
             PreEvaluationHash = preEvaluationHash;
             StateRootHash = stateRootHash;
+        }
+
+        public BlockHeader(
+            int protocolVersion,
+            long index,
+            string timestamp,
+            ImmutableArray<byte> nonce,
+            ImmutableArray<byte> miner,
+            long difficulty,
+            BigInteger totalDifficulty,
+            ImmutableArray<byte> previousHash,
+            ImmutableArray<byte> txHash)
+        {
+            ProtocolVersion = protocolVersion;
+            Index = index;
+            Timestamp = timestamp;
+            Nonce = nonce;
+            Miner = miner;
+            Difficulty = difficulty;
+            TotalDifficulty = totalDifficulty;
+            PreviousHash = previousHash;
+            TxHash = txHash;
+            PreEvaluationHash = Hashcash.Hash(SerializeForPreEvaluationHash()).ByteArray;
+            StateRootHash = ImmutableArray<byte>.Empty;
+            Hash = ImmutableArray<byte>.Empty;
+        }
+
+        public BlockHeader(
+            int protocolVersion,
+            long index,
+            string timestamp,
+            ImmutableArray<byte> nonce,
+            ImmutableArray<byte> miner,
+            long difficulty,
+            BigInteger totalDifficulty,
+            ImmutableArray<byte> previousHash,
+            ImmutableArray<byte> txHash,
+            ImmutableArray<byte> preEvaluationHash,
+            ImmutableArray<byte> stateRootHash)
+        {
+            if (preEvaluationHash.IsEmpty)
+            {
+                throw new ArgumentException("preEvaluationHash cannot be empty.");
+            }
+
+            if (stateRootHash.IsEmpty)
+            {
+                throw new ArgumentException("stateRootHash cannot be empty.");
+            }
+
+            ProtocolVersion = protocolVersion;
+            Index = index;
+            Timestamp = timestamp;
+            Nonce = nonce;
+            Miner = miner;
+            Difficulty = difficulty;
+            TotalDifficulty = totalDifficulty;
+            PreviousHash = previousHash;
+            TxHash = txHash;
+
+            PreEvaluationHash = preEvaluationHash;
+            StateRootHash = stateRootHash;
+            Hash = Hashcash.Hash(SerializeForHash()).ByteArray;
         }
 
         public BlockHeader(Bencodex.Types.Dictionary dict)
@@ -412,16 +475,57 @@ namespace Libplanet.Blocks
             }
         }
 
-        internal byte[] SerializeForHash(bool includeStateRootHash = true) => SerializeForHash(
-            ProtocolVersion,
-            Index,
-            Timestamp,
-            Difficulty,
-            Nonce,
-            Miner,
-            PreviousHash,
-            TxHash,
-            includeStateRootHash ? StateRootHash : ImmutableArray<byte>.Empty
-        );
+        internal Bencodex.Types.Dictionary ToBencodexForPreEvaluationHash()
+        {
+            var dict = Bencodex.Types.Dictionary.Empty
+                .Add("index", Index)
+                .Add("timestamp", Timestamp)
+                .Add("difficulty", Difficulty)
+                .Add("nonce", Nonce.ToArray());
+
+            if (ProtocolVersion != 0)
+            {
+                dict = dict.Add("protocol_version", ProtocolVersion);
+            }
+
+            if (!Miner.IsEmpty)
+            {
+                dict = dict.Add("reward_beneficiary", Miner.ToArray());
+            }
+
+            if (!PreviousHash.IsEmpty)
+            {
+                dict = dict.Add("previous_hash", PreviousHash.ToArray());
+            }
+
+            if (!TxHash.IsEmpty)
+            {
+                dict = dict.Add("transaction_fingerprint", TxHash.ToArray());
+            }
+
+            return dict;
+        }
+
+        internal Bencodex.Types.Dictionary ToBencodexForHash()
+        {
+            var dict = ToBencodexForPreEvaluationHash();
+
+            if (!StateRootHash.IsEmpty)
+            {
+                dict = dict.Add("state_root_hash", StateRootHash.ToArray());
+            }
+
+            return dict;
+        }
+
+        internal byte[] SerializeForPreEvaluationHash()
+            => new Codec().Encode(ToBencodexForPreEvaluationHash());
+
+        internal byte[] SerializeForHash(bool includeStateRootHash = true)
+        {
+            return includeStateRootHash
+                ? new Codec().Encode(ToBencodexForHash())
+                : new Codec().Encode(ToBencodexForPreEvaluationHash());
+        }
     }
 }
