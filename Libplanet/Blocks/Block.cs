@@ -25,7 +25,7 @@ namespace Libplanet.Blocks
         /// </summary>
         public const int CurrentProtocolVersion = BlockHeader.CurrentProtocolVersion;
 
-        private int _bytesLength;
+        private int? _bytesLength = null;
 
         /// <summary>
         /// Creates a <see cref="Block{T}"/> instance by manually filling all field values.
@@ -308,9 +308,7 @@ namespace Libplanet.Blocks
         {
             get
             {
-                // Note that Serialize() by itself caches _byteLength, so that this ByteLength
-                // property never invokes Serialize() more than once.
-                return _bytesLength > 0 ? _bytesLength : Serialize().Length;
+                return _bytesLength ?? (int)(_bytesLength = Serialize().Length);
             }
         }
 
@@ -469,7 +467,6 @@ namespace Libplanet.Blocks
         {
             var codec = new Codec();
             byte[] serialized = codec.Encode(ToBencodex());
-            _bytesLength = serialized.Length;
             return serialized;
         }
 
