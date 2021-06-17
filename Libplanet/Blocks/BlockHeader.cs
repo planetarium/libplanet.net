@@ -103,69 +103,6 @@ namespace Libplanet.Blocks
             StateRootHash = stateRootHash;
         }
 
-        public BlockHeader(
-            int protocolVersion,
-            long index,
-            string timestamp,
-            ImmutableArray<byte> nonce,
-            ImmutableArray<byte> miner,
-            long difficulty,
-            BigInteger totalDifficulty,
-            ImmutableArray<byte> previousHash,
-            ImmutableArray<byte> txHash)
-        {
-            ProtocolVersion = protocolVersion;
-            Index = index;
-            Timestamp = timestamp;
-            Nonce = nonce;
-            Miner = miner;
-            Difficulty = difficulty;
-            TotalDifficulty = totalDifficulty;
-            PreviousHash = previousHash;
-            TxHash = txHash;
-            PreEvaluationHash = Hashcash.Hash(SerializeForPreEvaluationHash()).ByteArray;
-            StateRootHash = ImmutableArray<byte>.Empty;
-            Hash = ImmutableArray<byte>.Empty;
-        }
-
-        public BlockHeader(
-            int protocolVersion,
-            long index,
-            string timestamp,
-            ImmutableArray<byte> nonce,
-            ImmutableArray<byte> miner,
-            long difficulty,
-            BigInteger totalDifficulty,
-            ImmutableArray<byte> previousHash,
-            ImmutableArray<byte> txHash,
-            ImmutableArray<byte> preEvaluationHash,
-            ImmutableArray<byte> stateRootHash)
-        {
-            if (preEvaluationHash.IsEmpty)
-            {
-                throw new ArgumentException("preEvaluationHash cannot be empty.");
-            }
-
-            if (stateRootHash.IsEmpty)
-            {
-                throw new ArgumentException("stateRootHash cannot be empty.");
-            }
-
-            ProtocolVersion = protocolVersion;
-            Index = index;
-            Timestamp = timestamp;
-            Nonce = nonce;
-            Miner = miner;
-            Difficulty = difficulty;
-            TotalDifficulty = totalDifficulty;
-            PreviousHash = previousHash;
-            TxHash = txHash;
-
-            PreEvaluationHash = preEvaluationHash;
-            StateRootHash = stateRootHash;
-            Hash = Hashcash.Hash(SerializeForHash()).ByteArray;
-        }
-
         public BlockHeader(Bencodex.Types.Dictionary dict)
         {
             ProtocolVersion = dict.ContainsKey(ProtocolVersionKey)
@@ -200,6 +137,59 @@ namespace Libplanet.Blocks
             StateRootHash = dict.ContainsKey((IKey)(Binary)StateRootHashKey)
                 ? dict.GetValue<Binary>(StateRootHashKey).ToImmutableArray()
                 : ImmutableArray<byte>.Empty;
+        }
+
+        internal BlockHeader(
+            int protocolVersion,
+            long index,
+            string timestamp,
+            ImmutableArray<byte> nonce,
+            ImmutableArray<byte> miner,
+            long difficulty,
+            BigInteger totalDifficulty,
+            ImmutableArray<byte> previousHash,
+            ImmutableArray<byte> txHash)
+        {
+            ProtocolVersion = protocolVersion;
+            Index = index;
+            Timestamp = timestamp;
+            Nonce = nonce;
+            Miner = miner;
+            Difficulty = difficulty;
+            TotalDifficulty = totalDifficulty;
+            PreviousHash = previousHash;
+            TxHash = txHash;
+            PreEvaluationHash = Hashcash.Hash(SerializeForPreEvaluationHash()).ByteArray;
+            StateRootHash = ImmutableArray<byte>.Empty;
+            Hash = PreEvaluationHash;
+        }
+
+        internal BlockHeader(
+            int protocolVersion,
+            long index,
+            string timestamp,
+            ImmutableArray<byte> nonce,
+            ImmutableArray<byte> miner,
+            long difficulty,
+            BigInteger totalDifficulty,
+            ImmutableArray<byte> previousHash,
+            ImmutableArray<byte> txHash,
+            ImmutableArray<byte> preEvaluationHash,
+            ImmutableArray<byte> stateRootHash)
+        {
+            ProtocolVersion = protocolVersion;
+            Index = index;
+            Timestamp = timestamp;
+            Nonce = nonce;
+            Miner = miner;
+            Difficulty = difficulty;
+            TotalDifficulty = totalDifficulty;
+            PreviousHash = previousHash;
+            TxHash = txHash;
+
+            PreEvaluationHash = preEvaluationHash;
+            StateRootHash = stateRootHash;
+            Hash = Hashcash.Hash(SerializeForHash()).ByteArray;
         }
 
         /// <summary>
