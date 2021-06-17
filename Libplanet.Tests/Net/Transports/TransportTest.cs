@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Libplanet.Crypto;
@@ -343,11 +344,16 @@ namespace Libplanet.Tests.Net.Transports
             try
             {
                 await InitializeAsync(transport);
+                // Make sure the tcp port is invalid.
+                var l = new TcpListener(IPAddress.Loopback, 0);
+                l.Start();
+                int port = ((IPEndPoint)l.LocalEndpoint).Port;
+                l.Stop();
                 var peer = new BoundPeer(
                     new PrivateKey().PublicKey,
                     new DnsEndPoint(
                         "0.0.0.0",
-                        ((BoundPeer)transport.AsPeer).EndPoint.Port + 1));
+                        port));
                 Task task = transport.SendMessageWithReplyAsync(
                     peer,
                     new Ping(),
