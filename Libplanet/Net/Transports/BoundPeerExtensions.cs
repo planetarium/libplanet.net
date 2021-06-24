@@ -39,13 +39,20 @@ namespace Libplanet.Net.Transports
             );
 
             TimeSpan timeoutNotNull = timeout ?? TimeSpan.FromSeconds(5);
-            if (dealerSocket.TrySendMultipartMessage(timeoutNotNull, request))
+            try
             {
-                var response = new NetMQMessage();
-                if (dealerSocket.TryReceiveMultipartMessage(timeoutNotNull, ref response))
+                if (dealerSocket.TrySendMultipartMessage(timeoutNotNull, request))
                 {
-                    return AppProtocolVersion.FromToken(response.First.ConvertToString());
+                    var response = new NetMQMessage();
+                    if (dealerSocket.TryReceiveMultipartMessage(timeoutNotNull, ref response))
+                    {
+                        return AppProtocolVersion.FromToken(response.First.ConvertToString());
+                    }
                 }
+            }
+            catch (TerminatingException)
+            {
+                throw new TimeoutException($"Peer didn't respond.");
             }
 
             throw new TimeoutException(
@@ -71,7 +78,15 @@ namespace Libplanet.Net.Transports
         )
         {
             using var client = new TcpClient();
-            await client.ConnectAsync(peer.EndPoint.Host, peer.EndPoint.Port);
+            try
+            {
+                await client.ConnectAsync(peer.EndPoint.Host, peer.EndPoint.Port);
+            }
+            catch (SocketException)
+            {
+                throw new TimeoutException("Cannot find peer.");
+            }
+
             client.ReceiveTimeout = timeout?.Milliseconds ?? 0;
             using var stream = client.GetStream();
             var key = new PrivateKey();
