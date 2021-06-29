@@ -492,9 +492,11 @@ namespace Libplanet.Tests.Blocks
         [Fact]
         public void OrderTxsForEvaluation()
         {
-            const int protocolVersion = 1;
+            // New test should be written once this breaks with a protocol version bump.
+            const int protocolVersion = BlockHeader.CurrentProtocolVersion;
             const int numSigners = 5;
             const int numTxsPerSigner = 3;
+            var epoch = DateTimeOffset.FromUnixTimeSeconds(0);
 
             ImmutableArray<PrivateKey> signers = ImmutableArray.Create(new PrivateKey[]
                 {
@@ -524,7 +526,7 @@ namespace Libplanet.Tests.Blocks
                         privateKey: signerNoncePair.signer,
                         genesisHash: null,
                         actions: new[] { new RandomAction(signerNoncePair.signer.ToAddress()) },
-                        timestamp: DateTimeOffset.UnixEpoch)).ToImmutableArray();
+                        timestamp: epoch)).ToImmutableArray();
             // Rearrange transactions so that transactions are not grouped by signers
             // while keeping the hard coded mixed order nonces above.
             txs = txs
