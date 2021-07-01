@@ -215,9 +215,8 @@ To be released.
  -  Added `BoundPeer.Parse()` static method.  [[#1240]]
  -  Added `TransportException` class.  [[#1242]]
  -  Added `SwarmOptions.StaticPeers` property.  [[#1230], [#1271]]
+ -  Added `SwarmOptions.StaticPeersMaintainPeriod` property.  [[#1230], [#1367]]
  -  Added `SwarmOptions.BranchpointThreshold` property.  [[#1348]]
- -  Added `StaticPeers` as the last parameter to
-    `RoutingTable(Address, int, int)` constructor.  [[#1230], [#1271]]
  -  Added `AtomicActionRenderer<T>` class.  [[#1267], [#1275]]
  -  Added `TxExecution` abstract class.  [[#1156], [#1289]]
  -  Added `TxSuccess` class.  [[#1156], [#1289]]
@@ -240,9 +239,6 @@ To be released.
     for this case).  [[#1156], [#1289]]
  -  `ITransport.StartAsync()` and `ITransport.RunAsync()` became to throw
     `TransportException` instead of `SwarmException`.  [[#1242]]
- -  When selecting peers for `ITransport.BroadcastMessage()`,
-    peers are selected from static peers in addition to peers selected
-    according to existing selection methods.  [[#1230], [#1271]]
  -  `NetMQTransport` became to enforce NetMQ/[AsyncIO] to use its pure .NET
     implementation instead of Windows'
     <abbr title="input/output completion port">IOCP</abbr> when it is running
@@ -261,6 +257,8 @@ To be released.
     if `OutOfMemoryException` is caught from `IAction.Execute()`.
     [[#1320], [#1343]]
  -  Improved performance of broadcasting using `Swarm<T>`.  [[#1334]]
+ -  `Swarm<T>` now maintains static peers provided via
+    `SwarmOptions.StaticPeers` periodically.  [[#1230], [#1367]]
 
 ### Bug fixes
 
@@ -371,6 +369,7 @@ To be released.
 [#1352]: https://github.com/planetarium/libplanet/pull/1352
 [#1353]: https://github.com/planetarium/libplanet/pull/1353
 [#1360]: https://github.com/planetarium/libplanet/pull/1360
+[#1367]: https://github.com/planetarium/libplanet/pull/1367
 [#1368]: https://github.com/planetarium/libplanet/pull/1368
 [#1379]: https://github.com/planetarium/libplanet/pull/1379
 
