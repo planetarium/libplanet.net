@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -277,66 +276,6 @@ namespace Libplanet.Tests.Net.Protocols
             }
 
             Assert.Empty(table.PeersToRefresh(TimeSpan.FromMinutes(1)));
-        }
-
-        [Fact]
-        public void StaticPeer()
-        {
-            var publicKey = new PrivateKey().PublicKey;
-            BoundPeer[] staticPeers = Enumerable.Range(0, 2)
-                .Select(
-                    i => new BoundPeer(
-                        TestUtils.GeneratePrivateKeyOfBucketIndex(publicKey.ToAddress(), i)
-                            .PublicKey,
-                        new DnsEndPoint("0.0.0.0", 1000 + i))).ToArray();
-            var table = new RoutingTable(
-                publicKey.ToAddress(),
-                staticPeers: staticPeers.ToImmutableHashSet());
-
-            Assert.Equal(2, table.Count);
-            Assert.Equal(staticPeers.ToHashSet(), table.Peers.ToHashSet());
-            Assert.Equal(staticPeers.ToHashSet(), table.StaticPeers.ToHashSet());
-            Assert.Empty(table.NonStaticPeers);
-            Assert.Single(table.PeersToBroadcast(null, 0));
-
-            // Adding peer already in static peer does not add peer to table, only updates.
-            var timestamp = DateTimeOffset.UtcNow;
-            var staticPeer = staticPeers.First();
-            table.AddPeer(staticPeer, timestamp);
-            Assert.Equal(2, table.Count);
-            Assert.Equal(staticPeers.ToHashSet(), table.Peers.ToHashSet());
-            Assert.Equal(staticPeers.ToHashSet(), table.StaticPeers.ToHashSet());
-            Assert.Empty(table.NonStaticPeers);
-            Assert.Contains(
-                table.PeerStates,
-                state => state.Peer.Address.Equals(staticPeer.Address));
-            Assert.Contains(
-                table.StaticPeerStates,
-                state => state.Peer.Address.Equals(staticPeer.Address));
-            DateTimeOffset? actual = table.PeerStates
-                .FirstOrDefault(state => state.Peer.Address.Equals(staticPeer.Address))
-                ?.LastUpdated;
-            Assert.Equal(timestamp, actual);
-
-            BoundPeer[] normalPeers = Enumerable.Range(0, 10)
-                .Select(
-                    i => new BoundPeer(
-                        TestUtils.GeneratePrivateKeyOfBucketIndex(publicKey.ToAddress(), i / 2)
-                            .PublicKey,
-                        new DnsEndPoint("0.0.0.0", 2000 + i))).ToArray();
-            foreach (var peer in normalPeers)
-            {
-                table.AddPeer(peer);
-            }
-
-            Assert.Equal(12, table.Count);
-            Assert.Equal(staticPeers.Union(normalPeers).ToHashSet(), table.Peers.ToHashSet());
-            IReadOnlyList<BoundPeer> peersToBroadcast = table.PeersToBroadcast(null, 0);
-
-            // Must contain at least one static peer
-            Assert.True(
-                peersToBroadcast.Contains(staticPeers[0]) ||
-                peersToBroadcast.Contains(staticPeers[1]));
         }
 
         private (PublicKey, PublicKey[]) GeneratePeersDifferentBuckets()

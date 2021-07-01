@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using Serilog;
 
@@ -13,7 +12,6 @@ namespace Libplanet.Net.Protocols
     {
         private readonly Address _address;
         private readonly KBucket[] _buckets;
-        private readonly PeerState[] _staticPeerStates;
 
         private readonly ILogger _logger;
 
@@ -23,17 +21,13 @@ namespace Libplanet.Net.Protocols
         /// <param name="address"><see cref="Address"/> of this peer.</param>
         /// <param name="tableSize">The number of buckets in the table.</param>
         /// <param name="bucketSize">The size of a single bucket.</param>
-        /// <param name="staticPeers">
-        /// The list of <see cref="Peer"/>s to keep in routing table permanently.
-        /// The <see cref="Peer"/>s in the list won't be removed in any cases.</param>
         /// <exception cref="ArgumentOutOfRangeException">
         /// Thrown when <paramref name="tableSize"/> or <paramref name="bucketSize"/> is
         /// less then or equal to 0.</exception>
         public RoutingTable(
             Address address,
             int tableSize = Kademlia.TableSize,
-            int bucketSize = Kademlia.BucketSize,
-            IImmutableSet<BoundPeer> staticPeers = null)
+            int bucketSize = Kademlia.BucketSize)
         {
             if (tableSize <= 0)
             {
@@ -58,9 +52,6 @@ namespace Libplanet.Net.Protocols
             }
 
             var initialized = DateTimeOffset.UtcNow;
-            _staticPeerStates = staticPeers is null
-                ? new PeerState[0]
-                : staticPeers.Select(boundPeer => new PeerState(boundPeer, initialized)).ToArray();
         }
 
         /// <summary>
@@ -76,38 +67,19 @@ namespace Libplanet.Net.Protocols
         /// <summary>
         /// The number of peers in the table.
         /// </summary>
-        public int Count => _buckets.Sum(bucket => bucket.Count) + _staticPeerStates.Length;
-
-        /// <summary>
-        /// An <see cref="IReadOnlyList{T}"/> of static peers in the table.
-        /// </summary>
-        public IReadOnlyList<BoundPeer> StaticPeers => _staticPeerStates
-            .Select(state => state.Peer)
-            .ToArray();
+        public int Count => _buckets.Sum(bucket => bucket.Count);
 
         /// <summary>
         /// An <see cref="IReadOnlyList{T}"/> of peers in the table.
         /// </summary>
-        public IReadOnlyList<BoundPeer> Peers => StaticPeers
-            .Union(NonEmptyBuckets.SelectMany(bucket => bucket.Peers))
-            .ToArray();
-
-        /// <summary>
-        /// An <see cref="IReadOnlyList{T}"/> of <see cref="PeerState"/> of
-        /// static peers in the table.
-        /// </summary>
-        public IReadOnlyList<PeerState> StaticPeerStates => _staticPeerStates.ToArray();
+        public IReadOnlyList<BoundPeer> Peers =>
+            NonEmptyBuckets.SelectMany(bucket => bucket.Peers).ToArray();
 
         /// <summary>
         /// An <see cref="IReadOnlyList{T}"/> of <see cref="PeerState"/> of peers in the table.
         /// </summary>
-        public IReadOnlyList<PeerState> PeerStates => StaticPeerStates
-            .Union(NonEmptyBuckets.SelectMany(bucket => bucket.PeerStates))
-            .ToArray();
-
-        // For unit tests
-        internal IReadOnlyList<BoundPeer> NonStaticPeers =>
-            NonEmptyBuckets.SelectMany(bucket => bucket.Peers).ToArray();
+        public IReadOnlyList<PeerState> PeerStates =>
+            NonEmptyBuckets.SelectMany(bucket => bucket.PeerStates).ToArray();
 
         internal IReadOnlyList<IReadOnlyList<BoundPeer>> CachesToCheck
         {
@@ -175,8 +147,7 @@ namespace Libplanet.Net.Protocols
         /// an element with the specified key; otherwise, <see langword="false"/>.</returns>
         public bool Contains(BoundPeer peer)
         {
-            return BucketOf(peer).Contains(peer) ||
-                   _staticPeerStates.Any(state => state.Peer.Address.Equals(peer.Address));
+            return BucketOf(peer).Contains(peer);
         }
 
         /// <summary>
@@ -261,17 +232,7 @@ namespace Libplanet.Net.Protocols
                 throw new ArgumentNullException(nameof(peer));
             }
 
-            PeerState staticState =
-                _staticPeerStates.FirstOrDefault(state => state.Peer.Address.Equals(peer.Address));
-            if (staticState is null)
-            {
-                BucketOf(peer).Check(peer, start, end);
-            }
-            else
-            {
-                staticState.LastChecked = start;
-                staticState.Latency = end - start;
-            }
+            BucketOf(peer).Check(peer, start, end);
         }
 
         internal void AddPeer(BoundPeer peer, DateTimeOffset updated)
@@ -289,25 +250,11 @@ namespace Libplanet.Net.Protocols
                 );
             }
 
-            PeerState staticState =
-                _staticPeerStates.FirstOrDefault(state => state.Peer.Address.Equals(peer.Address));
-            if (staticState is null)
-            {
-                _logger.Debug(
-                    "Adding a peer {Peer} to peer {Address}'s routing table...",
-                    peer,
-                    _address);
-                BucketOf(peer).AddPeer(peer, updated);
-            }
-            else
-            {
-                _logger.Verbose("The peer {Peer} to be added is already in static peer.", peer);
-
-                // This done because peer's other attribute except public key might be changed.
-                // (eg. public IP address, endpoint)
-                staticState.Peer = peer;
-                staticState.LastUpdated = updated;
-            }
+            _logger.Debug(
+                "Adding a peer {Peer} to peer {Address}'s routing table...",
+                peer,
+                _address);
+            BucketOf(peer).AddPeer(peer, updated);
         }
 
         internal IReadOnlyList<BoundPeer> PeersToBroadcast(Address? except, int min = 10)
@@ -315,25 +262,7 @@ namespace Libplanet.Net.Protocols
             List<BoundPeer> peers = NonEmptyBuckets
                 .Select(bucket => bucket.GetRandomPeer(except))
                 .Where(peer => !(peer is null)).ToList();
-            int count;
-            if (_staticPeerStates.Any())
-            {
-                var random = new Random();
-                var excepted = _staticPeerStates.Where(
-                    state => except is null || !state.Peer.Address.Equals(except));
-                var selected = _staticPeerStates[random.Next(_staticPeerStates.Length)];
-                peers.Add(selected.Peer);
-
-                count = peers.Count;
-                if (count < min)
-                {
-                    peers.AddRange(
-                        excepted.Where(state => peers.Contains(state.Peer)).Take(min - peers.Count)
-                            .Select(state => state.Peer));
-                }
-            }
-
-            count = peers.Count;
+            int count = peers.Count;
             if (count < min)
             {
                 peers.AddRange(Peers
@@ -349,10 +278,6 @@ namespace Libplanet.Net.Protocols
         internal IReadOnlyList<BoundPeer> PeersToRefresh(TimeSpan maxAge) => NonEmptyBuckets
             .Where(bucket => bucket.Tail.LastUpdated + maxAge < DateTimeOffset.UtcNow)
             .Select(bucket => bucket.Tail.Peer)
-            .Union(
-                _staticPeerStates
-                    .Where(state => state.LastUpdated + maxAge < DateTimeOffset.UtcNow)
-                    .Select(state => state.Peer).Take(1))
             .ToArray();
 
         internal bool RemoveCache(BoundPeer peer)

@@ -64,10 +64,17 @@ namespace Libplanet.Net
 
         /// <summary>
         /// The list of <see cref="Peer"/>s to keep in routing table permanently.
-        /// The <see cref="Peer"/>s in the list won't be removed in any cases.
+        /// The <see cref="Peer"/>s in the list will be maintained periodically within
+        /// <see cref="StaticPeersMaintainPeriod"/>.
         /// </summary>
         public IImmutableSet<BoundPeer> StaticPeers { get; set; } =
             ImmutableHashSet<BoundPeer>.Empty;
+
+        /// <summary>
+        /// The period of <c>Task</c> maintains static peer.
+        /// </summary>
+        /// <seealso cref="StaticPeers"/>
+        public TimeSpan StaticPeersMaintainPeriod { get; set; } = TimeSpan.FromSeconds(10);
 
         /// <summary>
         /// The threshold for detecting branchpoint when block synchronization.

@@ -136,7 +136,7 @@ namespace Libplanet.Net
                 .ForContext("SwarmId", loggerId);
 
             Options = options ?? new SwarmOptions();
-            RoutingTable = new RoutingTable(Address, tableSize, bucketSize, Options.StaticPeers);
+            RoutingTable = new RoutingTable(Address, tableSize, bucketSize);
             Transport = new NetMQTransport(
                 RoutingTable,
                 _privateKey,
@@ -366,6 +366,14 @@ namespace Libplanet.Net
                 tasks.Add(BroadcastTxAsync(broadcastTxInterval, _cancellationToken));
                 tasks.Add(ProcessFillBlocks(dialTimeout, _cancellationToken));
                 tasks.Add(ProcessFillTxs(_cancellationToken));
+                if (Options.StaticPeers.Any())
+                {
+                    tasks.Add(
+                        MaintainStaticPeerAsync(
+                            Options.StaticPeersMaintainPeriod,
+                            _cancellationToken));
+                }
+
                 _logger.Debug("Swarm started.");
 
                 await await Task.WhenAny(tasks);
@@ -427,6 +435,11 @@ namespace Libplanet.Net
 
             IEnumerable<BoundPeer> peers = seedPeers.OfType<BoundPeer>();
             IReadOnlyList<BoundPeer> peersBeforeBootstrap = RoutingTable.Peers;
+
+            if (Options.StaticPeers.Any())
+            {
+                await AddPeersAsync(Options.StaticPeers, pingSeedTimeout, cancellationToken);
+            }
 
             await PeerDiscovery.BootstrapAsync(
                 peers,
@@ -1727,6 +1740,26 @@ namespace Libplanet.Net
                               $"{nameof(RebuildConnectionAsync)}(): {{0}}";
                     _logger.Warning(e, msg, e);
                 }
+            }
+        }
+
+        private async Task MaintainStaticPeerAsync(
+            TimeSpan period,
+            CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(period, cancellationToken);
+                Options.StaticPeers.AsParallel().ForAll(async boundPeer =>
+                {
+                    if (!RoutingTable.Contains(boundPeer))
+                    {
+                        await AddPeersAsync(
+                            new[] { boundPeer },
+                            TimeSpan.FromSeconds(3),
+                            cancellationToken);
+                    }
+                });
             }
         }
     }
