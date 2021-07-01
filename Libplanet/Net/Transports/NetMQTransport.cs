@@ -620,29 +620,39 @@ namespace Libplanet.Net.Transports
 
                 peers.AsParallel().ForAll(peer =>
                 {
-                    string endpoint = peer.ToNetMQAddress();
-                    if (!_dealers.TryGetValue(peer.Address, out DealerSocket dealer) ||
-                        dealer.IsDisposed)
+                    try
                     {
-                        dealer = new DealerSocket(endpoint);
-                        _dealers[peer.Address] = dealer;
-                    }
-                    else if (dealer.Options.LastEndpoint != endpoint)
-                    {
-                        dealer.Dispose();
-                        dealer = new DealerSocket(endpoint);
-                        _dealers[peer.Address] = dealer;
-                    }
+                        string endpoint = peer.ToNetMQAddress();
+                        if (!_dealers.TryGetValue(peer.Address, out DealerSocket dealer) ||
+                            dealer.IsDisposed)
+                        {
+                            dealer = new DealerSocket(endpoint);
+                            _dealers[peer.Address] = dealer;
+                        }
+                        else if (dealer.Options.LastEndpoint != endpoint)
+                        {
+                            dealer.Dispose();
+                            dealer = new DealerSocket(endpoint);
+                            _dealers[peer.Address] = dealer;
+                        }
 
-                    if (!dealer.TrySendMultipartMessage(TimeSpan.FromSeconds(3), message))
-                    {
-                        _logger.Warning(
-                            "Broadcasting timed out. [Peer: {Peer}, Message: {Message}]",
-                            peer,
-                            msg
-                        );
+                        if (!dealer.TrySendMultipartMessage(TimeSpan.FromSeconds(3), message))
+                        {
+                            _logger.Warning(
+                                "Broadcasting timed out. [Peer: {Peer}, Message: {Message}]",
+                                peer,
+                                msg
+                            );
 
-                        dealer.Dispose();
+                            dealer.Dispose();
+                            _dealers.TryRemove(peer.Address, out _);
+                        }
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // NOTE: ObjectDisposedException can occur even the check exists. So just
+                        // ignore the case and remove dealer socket.
+                        _logger.Verbose("DealerSocket has been disposed.");
                         _dealers.TryRemove(peer.Address, out _);
                     }
                 });
