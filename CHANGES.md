@@ -263,6 +263,8 @@ To be released.
     in multithreading environment.  [[#1339], [#1342]]
  -  Fixed a bug where `Swarm<T>` hadn't respond immediately under load.
     [[#1360]]
+ -  Fixed a bug where `Swarm<T>` had stopped when `ObjectDisposedException`
+    is thrown during `NetMQTransport.DoBroadcast()`.  [[#1362], [#1365]]
 
 ### CLI tools
 
@@ -323,6 +325,8 @@ To be released.
 [#1348]: https://github.com/planetarium/libplanet/pull/1348
 [#1351]: https://github.com/planetarium/libplanet/pull/1351
 [#1360]: https://github.com/planetarium/libplanet/pull/1360
+[#1363]: https://github.com/planetarium/libplanet/issues/1363
+[#1365]: https://github.com/planetarium/libplanet/pull/1365
 
 
 Version 0.11.1
