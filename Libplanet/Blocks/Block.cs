@@ -103,14 +103,14 @@ namespace Libplanet.Blocks
             {
                 _preEvaluationHash = preEvaluationBlockHash;
                 StateRootHash = stateRootHash;
-                _hash = Hashcash.Hash(Header.SerializeForHash());
+                _hash = new BlockHash(Header.Hash);
             }
             else
             {
                 // FIXME: This only works due to sanity constraint on usage.
-                _preEvaluationHash = Hashcash.Hash(Header.SerializeForPreEvaluationHash());
+                _preEvaluationHash = new BlockHash(Header.PreEvaluationHash);
                 StateRootHash = stateRootHash;
-                _hash = _preEvaluationHash;
+                _hash = new BlockHash(Header.Hash);
             }
 
             // As the order of transactions should be unpredictable until a block is mined,
