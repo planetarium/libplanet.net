@@ -219,6 +219,8 @@ To be released.
  -  `BlockChain<T>.Append()` cumulates indexes for pairs (TxId and BlockHash).
     A transaction inclusion for a block is retrievable by using this index.
     [[#1315], [#1329]]
+ -  `Block<T>.Transactions` will be ordered using a different scheme once
+    the protocol version is bumped to `2`.  [[#1322], [#1323], [#1326]]
  -  `ActionEvaluator<T>.EvaluateActions()` now throws an unmanaged exception
     if `OutOfMemoryException` is caught from `IAction.Execute()`.
     [[#1320], [#1343]]
@@ -314,7 +316,10 @@ To be released.
 [#1315]: https://github.com/planetarium/libplanet/issues/1315
 [#1316]: https://github.com/planetarium/libplanet/issues/1316
 [#1320]: https://github.com/planetarium/libplanet/issues/1320
+[#1322]: https://github.com/planetarium/libplanet/issues/1322
+[#1323]: https://github.com/planetarium/libplanet/issues/1323
 [#1325]: https://github.com/planetarium/libplanet/pull/1325
+[#1326]: https://github.com/planetarium/libplanet/pull/1326
 [#1328]: https://github.com/planetarium/libplanet/pull/1328
 [#1329]: https://github.com/planetarium/libplanet/pull/1329
 [#1334]: https://github.com/planetarium/libplanet/pull/1334

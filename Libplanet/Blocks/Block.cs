@@ -88,39 +88,11 @@ namespace Libplanet.Blocks
             // FIXME: This does not need to be computed every time?
             Hash = Hashcash.Hash(Header.SerializeForHash());
 
-            // As the order of transactions should be unpredictable until a block is mined,
-            // the sorter key should be derived from both a block hash and a txid.
-            var hashInteger = new BigInteger(PreEvaluationHash.ToByteArray());
-
-            // If there are multiple transactions for the same signer these should be ordered by
-            // their tx nonces.  So transactions of the same signer should have the same sort key.
-            // The following logic "flattens" multiple tx ids having the same signer into a single
-            // txid by applying XOR between them.
-            IImmutableDictionary<Address, IImmutableSet<Transaction<T>>> signerTxs = Transactions
-                .GroupBy(tx => tx.Signer)
-                .ToImmutableDictionary(
-                    g => g.Key,
-                    g => (IImmutableSet<Transaction<T>>)g.ToImmutableHashSet()
-                );
-            IImmutableDictionary<Address, BigInteger> signerTxIds = signerTxs
-                .ToImmutableDictionary(
-                    pair => pair.Key,
-                    pair => pair.Value
-                        .Select(tx => new BigInteger(tx.Id.ToByteArray()))
-                        .OrderBy(txid => txid)
-                        .Aggregate((a, b) => a ^ b)
-                );
-
-            // Order signers by values derivied from both block hash and their "flatten" txid:
-            IImmutableList<Address> signers = signerTxIds
-                .OrderBy(pair => pair.Value ^ hashInteger)
-                .Select(pair => pair.Key)
-                .ToImmutableArray();
-
-            // Order transactions for each signer by their tx nonces:
-            Transactions = signers
-                .SelectMany(signer => signerTxs[signer].OrderBy(tx => tx.Nonce))
-                .ToImmutableArray();
+            // Order transactions for evaluation
+            Transactions = OrderTxsForEvaluation(
+                ProtocolVersion,
+                Transactions,
+                PreEvaluationHash).ToImmutableArray();
         }
 
         /// <summary>
@@ -480,6 +452,37 @@ namespace Libplanet.Blocks
         }
 
         /// <summary>
+        /// Deterministically shuffles <paramref name="txs"/> for evaluation using
+        /// <paramref name="preEvaluationHash"/> as a random seed.
+        /// </summary>
+        /// <param name="protocolVersion">The <see cref="Block{T}.ProtocolVersion"/> that
+        /// <paramref name="txs"/> belong to.</param>
+        /// <param name="txs">The list of <see cref="Transaction{T}"/>s to shuffle.</param>
+        /// <param name="preEvaluationHash">The <see cref="Block{T}.PreEvaluationHash"/> to use
+        /// as a random seed when shuffling.</param>
+        /// <returns>An <see cref="IEnumerable{T}"/> of <see cref="Transaction{T}"/>s in evaluation
+        /// order with the following properties:
+        /// <list type="bullet">
+        /// <item><see cref="Transaction{T}"/>s with the same <see cref="Transaction{T}.Signer"/>
+        /// value appear consecutive in the list.</item>
+        /// <item><see cref="Transaction{T}"/>s with the same <see cref="Transaction{T}.Signer"/>
+        /// value are ordered by <see cref="Transaction{T}.Nonce"/> value in ascending order.</item>
+        /// </list>
+        /// </returns>
+        /// <remarks>
+        /// This is to prevent an attempt to gain a first move advantage by participants.
+        /// </remarks>
+        internal static IEnumerable<Transaction<T>> OrderTxsForEvaluation(
+            int protocolVersion,
+            IEnumerable<Transaction<T>> txs,
+            BlockHash preEvaluationHash)
+        {
+            return protocolVersion > 1
+                ? OrderTxsForEvaluationV2(txs, preEvaluationHash)
+                : OrderTxsForEvaluationV0(txs, preEvaluationHash);
+        }
+
+        /// <summary>
         /// Validates this <see cref="Block{T}"/> and throws an appropriate exception
         /// if not valid.
         /// </summary>
@@ -571,6 +574,42 @@ namespace Libplanet.Blocks
 
             using SHA256 hashAlgo = SHA256.Create();
             return HashDigest<SHA256>.DeriveFrom(txHashSource);
+        }
+
+        private static IEnumerable<Transaction<T>> OrderTxsForEvaluationV0(
+            IEnumerable<Transaction<T>> txs,
+            BlockHash preEvaluationHash)
+        {
+            var maskInteger = new BigInteger(preEvaluationHash.ToByteArray());
+
+            // Transactions with the same signers are grouped first and the ordering of the groups
+            // is determined by the XOR aggregate of the txid's in the group with XOR bitmask
+            // applied using the pre-evaluation hash provided.  Then within each group,
+            // transactions are ordered by nonce.
+            return txs
+                .GroupBy(tx => tx.Signer)
+                .OrderBy(
+                    group => maskInteger ^ group
+                        .Select(tx => new BigInteger(tx.Id.ToByteArray()))
+                        .Aggregate((first, second) => first ^ second))
+                .SelectMany(group => group.OrderBy(tx => tx.Nonce));
+        }
+
+        private static IEnumerable<Transaction<T>> OrderTxsForEvaluationV2(
+            IEnumerable<Transaction<T>> txs,
+            BlockHash preEvaluationHash)
+        {
+            using SHA256 sha256 = SHA256.Create();
+            var maskInteger = new BigInteger(sha256.ComputeHash(preEvaluationHash.ToByteArray()));
+
+            // Transactions with the same signers are grouped first and the ordering of the groups
+            // is determined by the signer's address with XOR bitmask applied using
+            // the pre-evaluation hash provided.  Then within each group, transactions
+            // are ordered by nonce.
+            return txs
+                .GroupBy(tx => tx.Signer)
+                .OrderBy(group => maskInteger ^ new BigInteger(group.Key.ToByteArray()))
+                .SelectMany(group => group.OrderBy(tx => tx.Nonce));
         }
 
         private readonly struct BlockSerializationContext
