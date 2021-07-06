@@ -197,8 +197,7 @@ namespace Libplanet.Tests.Blocks
                 miner: ImmutableArray<byte>.Empty,
                 timestamp: future,
                 preEvaluationHash: TestUtils.GetRandomBytes(32).ToImmutableArray(),
-                stateRootHash: ImmutableArray<byte>.Empty
-            );
+                stateRootHash: TestUtils.GetRandomBytes(32).ToImmutableArray());
 
             Assert.Throws<InvalidBlockTimestampException>(
                 () => { header.Validate(now); });
@@ -371,33 +370,18 @@ namespace Libplanet.Tests.Blocks
             ImmutableArray<byte> stateRootHash
         )
         {
-            ImmutableArray<byte> hash = Hashcash.Hash(
-                BlockHeader.SerializeForHash(
-                    protocolVersion,
-                    index,
-                    timestamp,
-                    difficulty,
-                    nonce,
-                    miner,
-                    previousHash,
-                    txHash,
-                    stateRootHash
-                )
-            ).ByteArray;
             return new BlockHeader(
-                protocolVersion,
-                index,
-                timestamp,
-                nonce,
-                miner,
-                difficulty,
-                totalDifficulty,
-                previousHash,
-                txHash,
-                hash,
-                preEvaluationHash,
-                stateRootHash
-            );
+                protocolVersion: protocolVersion,
+                index: index,
+                timestamp: timestamp,
+                nonce: nonce,
+                miner: miner,
+                difficulty: difficulty,
+                totalDifficulty: totalDifficulty,
+                previousHash: previousHash,
+                txHash: txHash,
+                preEvaluationHash: preEvaluationHash,
+                stateRootHash: stateRootHash);
         }
     }
 }

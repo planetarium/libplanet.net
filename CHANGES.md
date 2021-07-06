@@ -223,6 +223,8 @@ To be released.
     if `OutOfMemoryException` is caught from `IAction.Execute()`.
     [[#1320], [#1343]]
  -  Improved performance of broadcasting using `Swarm<T>`.  [[#1334]]
+ -  `Block<T>.Header` is now cached instead of creating a new instance every
+    call. [[#1347]]
 
 ### Bug fixes
 
@@ -322,6 +324,7 @@ To be released.
 [#1340]: https://github.com/planetarium/libplanet/pull/1340
 [#1342]: https://github.com/planetarium/libplanet/pull/1342
 [#1343]: https://github.com/planetarium/libplanet/pull/1343
+[#1347]: https://github.com/planetarium/libplanet/pull/1347
 [#1348]: https://github.com/planetarium/libplanet/pull/1348
 [#1349]: https://github.com/planetarium/libplanet/issues/1349
 [#1350]: https://github.com/planetarium/libplanet/pull/1350
