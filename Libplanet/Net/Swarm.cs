@@ -137,18 +137,13 @@ namespace Libplanet.Net
 
             Options = options ?? new SwarmOptions();
             RoutingTable = new RoutingTable(Address, tableSize, bucketSize, Options.StaticPeers);
-            Transport = new NetMQTransport(
-                RoutingTable,
-                _privateKey,
-                _appProtocolVersion,
-                TrustedAppProtocolVersionSigners,
+            Transport = InitializeTransport(
                 workers,
                 host,
                 listenPort,
                 iceServers,
-                differentAppProtocolVersionEncountered,
-                Options.MessageLifespan);
-            Transport.ProcessMessageHandler += ProcessMessageHandler;
+                differentAppProtocolVersionEncountered);
+            Transport.ProcessMessageHandler.Register(ProcessMessageHandlerAsync);
             PeerDiscovery = new KademliaProtocol(RoutingTable, Transport, Address);
         }
 
@@ -163,13 +158,13 @@ namespace Libplanet.Net
             }
         }
 
-        public bool Running => Transport is NetMQTransport p && p.Running;
+        public bool Running => Transport?.Running ?? false;
 
         public DnsEndPoint EndPoint => AsPeer is BoundPeer boundPeer ? boundPeer.EndPoint : null;
 
         public Address Address => _privateKey.ToAddress();
 
-        public Peer AsPeer => Transport.AsPeer;
+        public Peer AsPeer => Transport?.AsPeer;
 
         /// <summary>
         /// The last time when any message was arrived.
@@ -221,10 +216,10 @@ namespace Libplanet.Net
         /// <summary>
         /// Waits until this <see cref="Swarm{T}"/> instance gets started to run.
         /// </summary>
-        /// <seealso cref="NetMQTransport.WaitForRunningAsync()"/>
-        /// <returns>A <see cref="Task"/> completed when <see cref="NetMQTransport.Running"/>
+        /// <seealso cref="ITransport.WaitForRunningAsync()"/>
+        /// <returns>A <see cref="Task"/> completed when <see cref="ITransport.Running"/>
         /// property becomes <c>true</c>.</returns>
-        public Task WaitForRunningAsync() => (Transport as NetMQTransport)?.WaitForRunningAsync();
+        public Task WaitForRunningAsync() => Transport?.WaitForRunningAsync();
 
         public void Dispose()
         {
@@ -340,13 +335,9 @@ namespace Libplanet.Net
                 ).Token;
             BlockDemand = null;
             _demandTxIds = new ConcurrentDictionary<TxId, BoundPeer>();
-            try
+            if (Transport.Running)
             {
-                await Transport.StartAsync(_cancellationToken);
-            }
-            catch (TransportException te)
-            {
-                throw new SwarmException("Swarm is already running.", innerException: te);
+                throw new SwarmException("Swarm is already running.");
             }
 
             _logger.Debug("Starting swarm...");
@@ -360,7 +351,7 @@ namespace Libplanet.Net
                         Options.RefreshLifespan,
                         _cancellationToken));
                 tasks.Add(RebuildConnectionAsync(TimeSpan.FromMinutes(30), _cancellationToken));
-                tasks.Add(Transport.RunAsync(_cancellationToken));
+                tasks.Add(Transport.StartAsync(_cancellationToken));
                 tasks.Add(BroadcastBlockAsync(broadcastBlockInterval, _cancellationToken));
                 tasks.Add(BroadcastTxAsync(broadcastTxInterval, _cancellationToken));
                 tasks.Add(ProcessFillBlocks(dialTimeout, _cancellationToken));
@@ -1292,6 +1283,45 @@ namespace Libplanet.Net
                     "Failed to fetch demand block hashes from {Peer}; " +
                     "retry with another peer...\n";
                 _logger.Debug(error, message, peer, error);
+            }
+        }
+
+        private ITransport InitializeTransport(
+            int workers,
+            string host,
+            int? listenPort,
+            IEnumerable<IceServer> iceServers,
+            DifferentAppProtocolVersionEncountered differentAppProtocolVersionEncountered)
+        {
+            switch (Options.Type)
+            {
+                case SwarmOptions.TransportType.NetMQTransport:
+                    return new NetMQTransport(
+                        RoutingTable,
+                        _privateKey,
+                        _appProtocolVersion,
+                        TrustedAppProtocolVersionSigners,
+                        workers,
+                        host,
+                        listenPort,
+                        iceServers ?? new IceServer[0],
+                        differentAppProtocolVersionEncountered,
+                        Options.MessageLifespan);
+
+                case SwarmOptions.TransportType.TcpTransport:
+                    return new TcpTransport(
+                        RoutingTable,
+                        _privateKey,
+                        _appProtocolVersion,
+                        TrustedAppProtocolVersionSigners,
+                        host,
+                        listenPort,
+                        iceServers ?? new IceServer[0],
+                        differentAppProtocolVersionEncountered,
+                        Options.MessageLifespan);
+
+                default:
+                    throw new ArgumentException(nameof(SwarmOptions.Type));
             }
         }
 

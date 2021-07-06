@@ -52,13 +52,14 @@ namespace Libplanet.Net.Transports
 
         private Channel<MessageRequest> _requests;
         private long _requestCount;
+        private CancellationTokenSource _runtimeProcessorCancellationTokenSource;
         private CancellationTokenSource _runtimeCancellationTokenSource;
         private CancellationTokenSource _turnCancellationTokenSource;
         private Task _runtimeProcessor;
 
         private TaskCompletionSource<object> _runningEvent;
-        private CancellationToken _cancellationToken;
         private ConcurrentDictionary<Address, DealerSocket> _dealers;
+        private ConcurrentDictionary<string, TaskCompletionSource<object>> _replyCompletionSources;
 
         private RoutingTable _table;
 
@@ -151,6 +152,7 @@ namespace Libplanet.Net.Transports
             _logger = Log.ForContext<NetMQTransport>();
 
             _requests = Channel.CreateUnbounded<MessageRequest>();
+            _runtimeProcessorCancellationTokenSource = new CancellationTokenSource();
             _runtimeCancellationTokenSource = new CancellationTokenSource();
             _turnCancellationTokenSource = new CancellationTokenSource();
             _requestCount = 0;
@@ -167,7 +169,7 @@ namespace Libplanet.Net.Transports
                         for (int i = 0; i < workers; i++)
                         {
                             workerTasks[i] = ProcessRuntime(
-                                _runtimeCancellationTokenSource.Token
+                                _runtimeProcessorCancellationTokenSource.Token
                             );
                         }
 
@@ -194,11 +196,14 @@ namespace Libplanet.Net.Transports
             );
 
             MessageHistory = new FixedSizedQueue<Message>(MessageHistoryCapacity);
+            ProcessMessageHandler = new AsyncDelegate<Message>();
             _dealers = new ConcurrentDictionary<Address, DealerSocket>();
+            _replyCompletionSources =
+                new ConcurrentDictionary<string, TaskCompletionSource<object>>();
         }
 
         /// <inheritdoc />
-        public event EventHandler<Message> ProcessMessageHandler;
+        public AsyncDelegate<Message> ProcessMessageHandler { get; }
 
         /// <inheritdoc cref="ITransport.AsPeer"/>
         public Peer AsPeer => EndPoint is null
@@ -226,7 +231,8 @@ namespace Libplanet.Net.Transports
             }
         }
 
-        internal FixedSizedQueue<Message> MessageHistory { get; }
+        /// <inheritdoc cref="ITransport.MessageHistory"/>
+        public ConcurrentQueue<Message> MessageHistory { get; }
 
         internal IPAddress PublicIPAddress => _turnClient?.PublicAddress;
 
@@ -235,6 +241,11 @@ namespace Libplanet.Net.Transports
         /// <inheritdoc />
         public async Task StartAsync(CancellationToken cancellationToken)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(NetMQTransport));
+            }
+
             if (Running)
             {
                 throw new TransportException("Transport is already running.");
@@ -253,16 +264,18 @@ namespace Libplanet.Net.Transports
             }
 
             _logger.Information($"Listen on {_listenPort}");
+            _runtimeCancellationTokenSource =
+                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            _turnCancellationTokenSource =
+                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
             if (_host is null && !(_iceServers is null))
             {
                 _turnClient = await IceServer.CreateTurnClient(_iceServers);
                 await _turnClient.StartAsync(_listenPort.Value, cancellationToken);
 
-                _ = RefreshPermissions(cancellationToken);
+                _ = RefreshPermissions(_runtimeCancellationTokenSource.Token);
             }
-
-            _cancellationToken = cancellationToken;
 
             if (_turnClient is null || !_turnClient.BehindNAT)
             {
@@ -279,27 +292,12 @@ namespace Libplanet.Net.Transports
             _router.ReceiveReady += ReceiveMessage;
             _replyQueue.ReceiveReady += DoReply;
             _broadcastQueue.ReceiveReady += DoBroadcast;
-        }
-
-        /// <inheritdoc />
-        public async Task RunAsync(CancellationToken cancellationToken)
-        {
-            if (Running)
-            {
-                throw new TransportException("Transport is already running.");
-            }
-
-            if (_router is null)
-            {
-                throw new TransportException(
-                    $"Transport needs to be started before {nameof(RunAsync)}().");
-            }
 
             List<Task> tasks = new List<Task>();
 
             tasks.Add(DisposeUnusedDealerSockets(
                 TimeSpan.FromSeconds(10),
-                _cancellationToken));
+                _runtimeCancellationTokenSource.Token));
             tasks.Add(RunPoller(_routerPoller));
             tasks.Add(RunPoller(_broadcastPoller));
 
@@ -314,6 +312,11 @@ namespace Libplanet.Net.Transports
             CancellationToken cancellationToken = default
         )
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(NetMQTransport));
+            }
+
             if (Running)
             {
                 await Task.Delay(waitFor, cancellationToken);
@@ -345,6 +348,8 @@ namespace Libplanet.Net.Transports
 
                 _dealers.Clear();
 
+                _runtimeCancellationTokenSource.Cancel();
+
                 Running = false;
             }
         }
@@ -355,22 +360,19 @@ namespace Libplanet.Net.Transports
             if (!_disposed)
             {
                 _requests.Writer.Complete();
+                _runtimeProcessorCancellationTokenSource.Cancel();
                 _runtimeCancellationTokenSource.Cancel();
                 _turnCancellationTokenSource.Cancel();
                 _runtimeProcessor.Wait();
 
+                _runtimeProcessorCancellationTokenSource.Dispose();
                 _runtimeCancellationTokenSource.Dispose();
                 _turnCancellationTokenSource.Dispose();
                 _disposed = true;
             }
         }
 
-        /// <summary>
-        /// Waits until this <see cref="NetMQTransport"/> instance gets started to run.
-        /// </summary>
-        /// <seealso cref="Swarm{T}.WaitForRunningAsync()"/>
-        /// <returns>A <see cref="Task"/> completed when <see cref="Running"/>
-        /// property becomes <c>true</c>.</returns>
+        /// <inheritdoc cref="ITransport.WaitForRunningAsync"/>
         public Task WaitForRunningAsync() => _runningEvent.Task;
 
         /// <inheritdoc />
@@ -408,11 +410,20 @@ namespace Libplanet.Net.Transports
             CancellationToken cancellationToken = default
         )
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(NetMQTransport));
+            }
+
             if (!(_turnClient is null) && _turnClient.BehindNAT)
             {
                 await CreatePermission(peer);
             }
 
+            using CancellationTokenSource cts =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    _runtimeCancellationTokenSource.Token,
+                    cancellationToken);
             Guid reqId = Guid.NewGuid();
             try
             {
@@ -428,10 +439,10 @@ namespace Libplanet.Net.Transports
 
                 // FIXME should we also cancel tcs sender side too?
                 using CancellationTokenRegistration ctr =
-                    cancellationToken.Register(() => tcs.TrySetCanceled());
+                    cts.Token.Register(() => tcs.TrySetCanceled());
                 await _requests.Writer.WriteAsync(
                     new MessageRequest(reqId, message, peer, now, timeout, expectedResponses, tcs),
-                    cancellationToken
+                    cts.Token
                 );
                 _logger.Verbose(
                     "Enqueued a request {RequestId} to the peer {Peer}: {@Message}; " +
@@ -516,19 +527,36 @@ namespace Libplanet.Net.Transports
         /// <inheritdoc />
         public void BroadcastMessage(Address? except, Message message)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(NetMQTransport));
+            }
+
             _broadcastQueue.Enqueue((except, message));
         }
 
         /// <inheritdoc />
-        public void ReplyMessage(Message message)
+        public async Task ReplyMessageAsync(Message message, CancellationToken cancellationToken)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(NetMQTransport));
+            }
+
             string identityHex = ByteUtil.Hex(message.Identity);
+            var tcs = new TaskCompletionSource<object>();
+            using CancellationTokenRegistration ctr =
+                cancellationToken.Register(() => tcs.TrySetCanceled());
+            _replyCompletionSources.TryAdd(identityHex, tcs);
             _logger.Debug("Reply {Message} to {Identity}...", message, identityHex);
             _replyQueue.Enqueue(message.ToNetMQMessage(
                 _privateKey,
                 AsPeer,
                 DateTimeOffset.UtcNow,
                 _appProtocolVersion));
+
+            await tcs.Task;
+            _replyCompletionSources.TryRemove(identityHex, out _);
         }
 
         private void ReceiveMessage(object sender, NetMQSocketEventArgs e)
@@ -541,7 +569,7 @@ namespace Libplanet.Net.Transports
                     raw.FrameCount
                 );
 
-                if (_cancellationToken.IsCancellationRequested)
+                if (_runtimeCancellationTokenSource.IsCancellationRequested)
                 {
                     return;
                 }
@@ -560,7 +588,7 @@ namespace Libplanet.Net.Transports
 
                 try
                 {
-                    ProcessMessageHandler?.Invoke(this, message);
+                    _ = ProcessMessageHandler.InvokeAsync(message);
                 }
                 catch (Exception exc)
                 {
@@ -577,13 +605,14 @@ namespace Libplanet.Net.Transports
                 {
                     Identity = dapve.Identity,
                 };
-                ReplyMessage(differentVersion);
+                _ = ReplyMessageAsync(differentVersion, _runtimeCancellationTokenSource.Token);
                 _logger.Debug("Message from peer with different version received.");
             }
             catch (InvalidTimestampException ite)
             {
-                const string logMsg = "The received message is stale. " +
-                            "(timestamp: {Timestamp}, lifespan: {Lifespan}, current: {Current})";
+                const string logMsg =
+                    "The received message is stale. " +
+                    "(timestamp: {Timestamp}, lifespan: {Lifespan}, current: {Current})";
                 _logger.Debug(logMsg, ite.CreatedOffset, ite.Lifespan, ite.CurrentOffset);
             }
             catch (InvalidMessageException ex)
@@ -674,6 +703,9 @@ namespace Libplanet.Net.Transports
             {
                 _logger.Debug("Failed to reply to {Identity}", identityHex);
             }
+
+            _replyCompletionSources.TryGetValue(identityHex, out TaskCompletionSource<object> tcs);
+            tcs?.TrySetResult(null);
         }
 
         private async Task RefreshPermissions(

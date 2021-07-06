@@ -135,8 +135,15 @@ namespace Libplanet.Tests.Net
                 options);
             _finalizers.Add(async () =>
             {
-                await StopAsync(swarm);
-                swarm.Dispose();
+                try
+                {
+                    await StopAsync(swarm);
+                    swarm.Dispose();
+                }
+                catch (ObjectDisposedException)
+                {
+                    _logger.Debug("Swarm {Swarm} is already disposed.", swarm);
+                }
             });
             return swarm;
         }

@@ -247,7 +247,8 @@ namespace Libplanet.Net
                         logSessionIds: (logSessionId, subSessionId),
                         cancellationToken: cancellationToken
                     );
-                    IEnumerable<Tuple<long, BlockHash>> hashes = await hashesAsync.ToArrayAsync();
+                    IEnumerable<Tuple<long, BlockHash>> hashes =
+                        await hashesAsync.ToArrayAsync(cancellationToken);
 
                     if (!hashes.Any())
                     {

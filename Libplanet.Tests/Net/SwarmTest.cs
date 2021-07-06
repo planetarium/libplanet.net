@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -24,12 +25,11 @@ using Libplanet.Tests.Common.Action;
 using Libplanet.Tests.Store;
 using Libplanet.Tests.Store.Trie;
 using Libplanet.Tx;
-using NetMQ;
-using NetMQ.Sockets;
 using Serilog;
 using xRetry;
 using Xunit;
 using Xunit.Abstractions;
+using Xunit.Sdk;
 
 namespace Libplanet.Tests.Net
 {
@@ -69,9 +69,6 @@ namespace Libplanet.Tests.Net
             }
 
             Log.Logger.Debug("Finished to finalize {Resources} resources.", _finalizers.Count);
-
-            NetMQConfig.Cleanup(false);
-            Log.Logger.Debug($"Finished to clean up the {nameof(NetMQConfig)} singleton.");
         }
 
         [Fact(Timeout = Timeout)]
@@ -98,8 +95,9 @@ namespace Libplanet.Tests.Net
         {
             Swarm<DumbAction> seed = CreateSwarm();
 
-            Swarm<DumbAction> swarmA = CreateSwarm();
-            Swarm<DumbAction> swarmB = CreateSwarm();
+            var privateKey = new PrivateKey();
+            Swarm<DumbAction> swarmA = CreateSwarm(privateKey: privateKey);
+            Swarm<DumbAction> swarmB = CreateSwarm(privateKey: privateKey);
 
             try
             {
@@ -401,43 +399,23 @@ namespace Libplanet.Tests.Net
                     null
                 ).ToArrayAsync();
 
-                var netMQAddress = $"tcp://{peer.EndPoint.Host}:{peer.EndPoint.Port}";
-                using (var socket = new DealerSocket(netMQAddress))
-                {
-                    var request = new GetBlocks(hashes.Select(pair => pair.Item2), 2);
-                    socket.SendMultipartMessage(
-                        request.ToNetMQMessage(
-                            privateKey,
-                            swarmB.AsPeer,
-                            DateTimeOffset.UtcNow,
-                            swarmB.AppProtocolVersion)
-                    );
+                ITransport transport = swarmB.Transport;
 
-                    NetMQMessage response = socket.ReceiveMultipartMessage();
-                    Message parsedMessage = Message.Parse(
-                        response,
-                        true,
-                        swarmA.AppProtocolVersion,
-                        swarmA.TrustedAppProtocolVersionSigners,
-                        null,
-                        null);
-                    Libplanet.Net.Messages.Blocks blockMessage =
-                        (Libplanet.Net.Messages.Blocks)parsedMessage;
+                var request = new GetBlocks(hashes.Select(pair => pair.Item2), 2);
+                Message[] responses = (await transport.SendMessageWithReplyAsync(
+                    (BoundPeer)swarmA.AsPeer,
+                    request,
+                    null,
+                    2,
+                    default)).ToArray();
+                var blockMessage = (Libplanet.Net.Messages.Blocks)responses[0];
 
-                    Assert.Equal(2, blockMessage.Payloads.Count);
+                Assert.Equal(2, responses.Length);
+                Assert.Equal(2, blockMessage.Payloads.Count);
 
-                    response = socket.ReceiveMultipartMessage();
-                    parsedMessage = Message.Parse(
-                        response,
-                        true,
-                        swarmA.AppProtocolVersion,
-                        swarmA.TrustedAppProtocolVersionSigners,
-                        null,
-                        null);
-                    blockMessage = (Libplanet.Net.Messages.Blocks)parsedMessage;
+                blockMessage = (Libplanet.Net.Messages.Blocks)responses[1];
 
-                    Assert.Single(blockMessage.Payloads);
-                }
+                Assert.Single(blockMessage.Payloads);
             }
             finally
             {
@@ -1523,7 +1501,7 @@ namespace Libplanet.Tests.Net
 
                 // Awaits 1 second because receiver swarm may tried to fill again after filled.
                 await Task.Delay(1000);
-                var transport = receiver.Transport as NetMQTransport;
+                var transport = receiver.Transport;
                 Log.Debug("Messages: {@Message}", transport.MessageHistory);
                 Assert.Single(
                     transport.MessageHistory.Where(msg => msg is Libplanet.Net.Messages.Blocks));
@@ -1667,8 +1645,8 @@ namespace Libplanet.Tests.Net
                 BoundPeer peer = swarm.AsPeer as BoundPeer;
                 Assert.NotNull(peer);
                 _logger.Debug(
-                    "{0}///{1}///{2}",
-                    peer.PublicKey,
+                    "{Address}///{EndPoint}///{PublicIPAddress}",
+                    peer.Address,
                     peer.EndPoint,
                     peer.PublicIPAddress);
 
@@ -1677,89 +1655,93 @@ namespace Libplanet.Tests.Net
                 Assert.True(lowerBlock.TotalDifficulty < higherBlock.TotalDifficulty);
                 var privateKey1 = new PrivateKey();
                 var privateKey2 = new PrivateKey();
-                var sender1 = new BoundPeer(
-                    privateKey1.PublicKey,
-                    new DnsEndPoint("127.0.0.1", 20000));
-                var sender2 = new BoundPeer(
-                    privateKey2.PublicKey,
-                    new DnsEndPoint("127.0.0.1", 20001));
-                _logger.Debug(
-                    "{0}///{1}///{2}",
-                    sender1.PublicKey,
-                    sender1.EndPoint,
-                    sender1.PublicIPAddress);
-                _logger.Debug("STEP1");
 
-                var netMQAddress = $"tcp://{peer.EndPoint.Host}:{peer.EndPoint.Port}";
-                using (var socket = new DealerSocket(netMQAddress))
+                ITransport CreateTransport(PrivateKey privateKey, int port)
                 {
-                    var request =
-                        new BlockHeaderMessage(swarm.BlockChain.Genesis.Hash, higherBlock.Header);
-                    socket.SendMultipartMessage(
-                        request.ToNetMQMessage(
-                            privateKey1,
-                            sender1,
-                            DateTimeOffset.UtcNow,
-                            swarm.AppProtocolVersion)
-                    );
-                    await swarm.BlockHeaderReceived.WaitAsync();
-                    await Task.Delay(100);
-                    Assert.NotNull(swarm.BlockDemand);
-                    var timestamp = swarm.BlockDemand.Value.Timestamp;
-                    Assert.Equal(higherBlock.Index, swarm.BlockDemand.Value.Header.Index);
-
-                    request =
-                        new BlockHeaderMessage(swarm.BlockChain.Genesis.Hash, lowerBlock.Header);
-                    socket.SendMultipartMessage(
-                        request.ToNetMQMessage(
-                            privateKey2,
-                            sender2,
-                            DateTimeOffset.UtcNow,
-                            swarm.AppProtocolVersion)
-                    );
-                    await swarm.BlockHeaderReceived.WaitAsync();
-                    // Await for context change
-                    await Task.Delay(100);
-                    Assert.NotNull(swarm.BlockDemand);
-                    // Demand will not be refreshed.
-                    Assert.Equal(higherBlock.Index, swarm.BlockDemand.Value.Header.Index);
-                    Assert.Equal(timestamp, swarm.BlockDemand.Value.Timestamp);
-
-                    await Task.Delay(
-                        swarmOptions.BlockDemandLifespan + TimeSpan.FromMilliseconds(100));
-
-                    request =
-                        new BlockHeaderMessage(swarm.BlockChain.Genesis.Hash, higherBlock.Header);
-                    socket.SendMultipartMessage(
-                        request.ToNetMQMessage(
-                            privateKey1,
-                            sender1,
-                            DateTimeOffset.UtcNow,
-                            swarm.AppProtocolVersion)
-                    );
-                    await swarm.BlockHeaderReceived.WaitAsync();
-                    await Task.Delay(100);
-                    Assert.NotNull(swarm.BlockDemand);
-                    // Demand will not be refreshed.
-                    Assert.Equal(higherBlock.Index, swarm.BlockDemand.Value.Header.Index);
-                    Assert.Equal(timestamp, swarm.BlockDemand.Value.Timestamp);
-
-                    request =
-                        new BlockHeaderMessage(swarm.BlockChain.Genesis.Hash, lowerBlock.Header);
-                    socket.SendMultipartMessage(
-                        request.ToNetMQMessage(
-                            privateKey2,
-                            sender2,
-                            DateTimeOffset.UtcNow,
-                            swarm.AppProtocolVersion)
-                    );
-                    await swarm.BlockHeaderReceived.WaitAsync();
-                    await Task.Delay(100);
-                    _logger.Debug("STEP5");
-                    Assert.NotNull(swarm.BlockDemand);
-                    // Demand will be replaced to lower one because it's stale.
-                    Assert.Equal(lowerBlock.Index, swarm.BlockDemand.Value.Header.Index);
+                    if (swarm.Transport is NetMQTransport)
+                    {
+                        return new NetMQTransport(
+                            new RoutingTable(privateKey.ToAddress()),
+                            privateKey,
+                            swarm.AppProtocolVersion,
+                            null,
+                            30,
+                            "127.0.0.1",
+                            port,
+                            new IceServer[0],
+                            null);
+                    }
+                    else if (swarm.Transport is TcpTransport)
+                    {
+                        return new TcpTransport(
+                            new RoutingTable(privateKey.ToAddress()),
+                            privateKey,
+                            swarm.AppProtocolVersion,
+                            null,
+                            "127.0.0.1",
+                            port,
+                            new IceServer[0],
+                            null);
+                    }
+                    else
+                    {
+                        throw new XunitException(
+                            "Transport constructor is required for each transport type.");
+                    }
                 }
+
+                ITransport transport1 = CreateTransport(privateKey1, 20000);
+                ITransport transport2 = CreateTransport(privateKey2, 20001);
+                _ = transport1.StartAsync();
+                _ = transport2.StartAsync();
+                await transport1.WaitForRunningAsync();
+                await transport2.WaitForRunningAsync();
+
+                var request =
+                    new BlockHeaderMessage(swarm.BlockChain.Genesis.Hash, higherBlock.Header);
+                await transport1.SendMessageAsync(peer, request, default);
+                await swarm.BlockHeaderReceived.WaitAsync();
+                await Task.Delay(100);
+                Assert.NotNull(swarm.BlockDemand);
+                var timestamp = swarm.BlockDemand.Value.Timestamp;
+                Assert.Equal(higherBlock.Index, swarm.BlockDemand.Value.Header.Index);
+
+                request =
+                    new BlockHeaderMessage(swarm.BlockChain.Genesis.Hash, lowerBlock.Header);
+                await transport2.SendMessageAsync(peer, request, default);
+                await swarm.BlockHeaderReceived.WaitAsync();
+                // Await for context change
+                await Task.Delay(100);
+                Assert.NotNull(swarm.BlockDemand);
+                // Demand will not be refreshed.
+                Assert.Equal(higherBlock.Index, swarm.BlockDemand.Value.Header.Index);
+                Assert.Equal(timestamp, swarm.BlockDemand.Value.Timestamp);
+
+                await Task.Delay(
+                    swarmOptions.BlockDemandLifespan + TimeSpan.FromMilliseconds(100));
+
+                request =
+                    new BlockHeaderMessage(swarm.BlockChain.Genesis.Hash, higherBlock.Header);
+                await transport1.SendMessageAsync(peer, request, default);
+                await swarm.BlockHeaderReceived.WaitAsync();
+                await Task.Delay(100);
+                Assert.NotNull(swarm.BlockDemand);
+
+                Assert.Equal(higherBlock.Index, swarm.BlockDemand.Value.Header.Index);
+                // Demand will not be refreshed.
+                Assert.Equal(timestamp, swarm.BlockDemand.Value.Timestamp);
+
+                await Task.Delay(
+                    swarmOptions.BlockDemandLifespan + TimeSpan.FromMilliseconds(100));
+
+                request =
+                    new BlockHeaderMessage(swarm.BlockChain.Genesis.Hash, lowerBlock.Header);
+                await transport2.SendMessageAsync(peer, request, default);
+                await swarm.BlockHeaderReceived.WaitAsync();
+                await Task.Delay(100);
+                Assert.NotNull(swarm.BlockDemand);
+                // Demand will be replaced to lower one because it's stale.
+                Assert.Equal(lowerBlock.Index, swarm.BlockDemand.Value.Header.Index);
             }
             finally
             {

@@ -9,6 +9,7 @@ using Libplanet.Net;
 using Libplanet.Net.Messages;
 using Libplanet.Net.Protocols;
 using Libplanet.Net.Transports;
+using NetMQ;
 using Nito.AsyncEx;
 using Serilog;
 using Xunit;
@@ -16,7 +17,8 @@ using Xunit.Abstractions;
 
 namespace Libplanet.Tests.Net.Transports
 {
-    public class NetMQTransportTest : TransportTest
+    [Collection("NetMQConfiguration")]
+    public class NetMQTransportTest : TransportTest, IDisposable
     {
         public NetMQTransportTest(ITestOutputHelper testOutputHelper)
         {
@@ -50,8 +52,13 @@ namespace Libplanet.Tests.Net.Transports
                 .Enrich.WithThreadId()
                 .WriteTo.TestOutput(testOutputHelper, outputTemplate: outputTemplate)
                 .CreateLogger()
-                .ForContext<TransportTest>();
-            Logger = Log.ForContext<TransportTest>();
+                .ForContext<NetMQTransportTest>();
+            Logger = Log.ForContext<NetMQTransportTest>();
+        }
+
+        public void Dispose()
+        {
+            NetMQConfig.Cleanup(false);
         }
 
         [SkippableFact(Timeout = Timeout, Skip = "Target method is broken.")]
@@ -61,10 +68,11 @@ namespace Libplanet.Tests.Net.Transports
             var transportB = CreateNetMQTransport();
 
             var messageReceived = new AsyncAutoResetEvent();
-            transportB.ProcessMessageHandler += (sender, message) =>
+            transportB.ProcessMessageHandler.Register(async message =>
             {
                 messageReceived.Set();
-            };
+                await Task.Yield();
+            });
 
             try
             {

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Threading;
@@ -14,11 +15,11 @@ namespace Libplanet.Net.Transports
     public interface ITransport : IDisposable
     {
         /// <summary>
-        /// The <see cref="EventHandler"/> invoked when a message that is not
+        /// The list of tasks invoked when a message that is not
         /// a reply is received. To handle reply, please use <see cref=
         /// "SendMessageWithReplyAsync(BoundPeer,Message,TimeSpan?,CancellationToken)"/>.
         /// </summary>
-        event EventHandler<Message> ProcessMessageHandler;
+        AsyncDelegate<Message> ProcessMessageHandler { get; }
 
         /// <summary>
         /// <see cref="Peer"/> representation of <see cref="ITransport"/>.
@@ -40,23 +41,22 @@ namespace Libplanet.Net.Transports
         bool Running { get; }
 
         /// <summary>
-        /// Initiates transport layer.
+        /// A fixed sized queue that keeps history of <see cref="Message"/> received.
+        /// It saves at most 30 recent <see cref="Message"/>s.
         /// </summary>
-        /// <param name="cancellationToken">
-        /// A cancellation token used to propagate notification that this
-        /// operation should be canceled.</param>
-        /// <returns>An awaitable task without value.</returns>
-        Task StartAsync(CancellationToken cancellationToken = default);
+        [Pure]
+        ConcurrentQueue<Message> MessageHistory { get; }
 
         /// <summary>
-        /// Starts running transport layer. To <see cref="RunAsync"/>, you should call
-        /// <see cref="StartAsync"/> first.
+        /// Initiates and runs transport layer.
         /// </summary>
         /// <param name="cancellationToken">
         /// A cancellation token used to propagate notification that this
         /// operation should be canceled.</param>
         /// <returns>An awaitable task without value.</returns>
-        Task RunAsync(CancellationToken cancellationToken = default);
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
+        Task StartAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Stops running transport layer.
@@ -67,9 +67,18 @@ namespace Libplanet.Net.Transports
         /// A cancellation token used to propagate notification that this
         /// operation should be canceled.</param>
         /// <returns>An awaitable task without value.</returns>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         Task StopAsync(
             TimeSpan waitFor,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Waits until this <see cref="ITransport"/> instance gets started to run.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> completed when <see cref="ITransport.Running"/>
+        /// property becomes <c>true</c>.</returns>
+        Task WaitForRunningAsync();
 
         /// <summary>
         /// Sends the <paramref name="message"/> to given <paramref name="peer"/>.
@@ -80,6 +89,8 @@ namespace Libplanet.Net.Transports
         /// A cancellation token used to propagate notification that this
         /// operation should be canceled.</param>
         /// <returns>An awaitable task without value.</returns>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         Task SendMessageAsync(BoundPeer peer, Message message, CancellationToken cancellationToken);
 
         /// <summary>
@@ -94,6 +105,8 @@ namespace Libplanet.Net.Transports
         /// operation should be canceled.</param>
         /// <returns>The replies of the <paramref name="message"/>
         /// sent by <paramref name="peer"/>.</returns>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         Task<Message> SendMessageWithReplyAsync(
             BoundPeer peer,
             Message message,
@@ -113,6 +126,8 @@ namespace Libplanet.Net.Transports
         /// operation should be canceled.</param>
         /// <returns>The replies of the <paramref name="message"/>
         /// sent by <paramref name="peer"/>.</returns>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         Task<IEnumerable<Message>> SendMessageWithReplyAsync(
             BoundPeer peer,
             Message message,
@@ -126,6 +141,8 @@ namespace Libplanet.Net.Transports
         /// <param name="except">An <see cref="Address"/> to exclude from broadcasting.
         /// If <c>null</c> is given, no peers will be excluded.</param>
         /// <param name="message">A <see cref="Message"/> to broadcast.</param>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
         void BroadcastMessage(Address? except, Message message);
 
         /// <summary>
@@ -137,6 +154,12 @@ namespace Libplanet.Net.Transports
         /// <paramref name="message"/>.
         /// </remarks>
         /// <param name="message">A <see cref="Message"/> to reply.</param>
-        void ReplyMessage(Message message);
+        /// <param name="cancellationToken">
+        /// A cancellation token used to propagate notification that this
+        /// operation should be canceled.</param>
+        /// <returns>An awaitable task without value.</returns>
+        /// <exception cref="ObjectDisposedException">
+        /// Thrown when <see cref="ITransport"/> instance is already disposed.</exception>
+        Task ReplyMessageAsync(Message message, CancellationToken cancellationToken);
     }
 }

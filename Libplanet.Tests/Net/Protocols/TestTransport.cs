@@ -32,8 +32,10 @@ namespace Libplanet.Tests.Net.Protocols
         private readonly Random _random;
         private readonly bool _blockBroadcast;
 
+        private TaskCompletionSource<object> _runningEvent;
         private CancellationTokenSource _swarmCancellationTokenSource;
         private TimeSpan _networkDelay;
+        private bool _disposed;
 
         public TestTransport(
             Dictionary<Address, TestTransport> transports,
@@ -43,6 +45,7 @@ namespace Libplanet.Tests.Net.Protocols
             int bucketSize,
             TimeSpan? networkDelay)
         {
+            _runningEvent = new TaskCompletionSource<object>();
             _privateKey = privateKey;
             _blockBroadcast = blockBroadcast;
             var loggerId = _privateKey.ToAddress().ToHex();
@@ -60,10 +63,12 @@ namespace Libplanet.Tests.Net.Protocols
             _ignoreTestMessageWithData = new List<string>();
             _random = new Random();
             Table = new RoutingTable(Address, tableSize, bucketSize);
+            ProcessMessageHandler = new AsyncDelegate<Message>();
             Protocol = new KademliaProtocol(Table, this, Address);
+            MessageHistory = new FixedSizedQueue<Message>(30);
         }
 
-        public event EventHandler<Message> ProcessMessageHandler;
+        public AsyncDelegate<Message> ProcessMessageHandler { get; }
 
         public AsyncAutoResetEvent MessageReceived { get; }
 
@@ -77,7 +82,24 @@ namespace Libplanet.Tests.Net.Protocols
 
         public DateTimeOffset? LastMessageTimestamp { get; private set; }
 
-        public bool Running => !(_swarmCancellationTokenSource is null);
+        public bool Running
+        {
+            get => _runningEvent.Task.Status == TaskStatus.RanToCompletion;
+
+            private set
+            {
+                if (value)
+                {
+                    _runningEvent.TrySetResult(null);
+                }
+                else
+                {
+                    _runningEvent = new TaskCompletionSource<object>();
+                }
+            }
+        }
+
+        public ConcurrentQueue<Message> MessageHistory { get; }
 
         internal ConcurrentBag<Message> ReceivedMessages { get; }
 
@@ -87,26 +109,31 @@ namespace Libplanet.Tests.Net.Protocols
 
         public void Dispose()
         {
+            if (!_disposed)
+            {
+                _swarmCancellationTokenSource?.Cancel();
+                Running = false;
+                _disposed = true;
+            }
         }
 
-#pragma warning disable CS1998 // Method need to implement ITransport but it isn't be async
         public async Task StartAsync(
             CancellationToken cancellationToken = default(CancellationToken))
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TestTransport));
+            }
+
             _logger.Debug("Starting transport of {Peer}.", AsPeer);
             _swarmCancellationTokenSource = new CancellationTokenSource();
-        }
-#pragma warning restore CS1998
-
-        public async Task RunAsync(
-            CancellationToken cancellationToken = default(CancellationToken))
-        {
             CancellationToken token = cancellationToken.Equals(CancellationToken.None)
                 ? _swarmCancellationTokenSource.Token
                 : CancellationTokenSource
                     .CreateLinkedTokenSource(
                         _swarmCancellationTokenSource.Token, cancellationToken)
                     .Token;
+            Running = true;
             await ProcessRuntime(token);
         }
 
@@ -114,10 +141,23 @@ namespace Libplanet.Tests.Net.Protocols
             TimeSpan waitFor,
             CancellationToken cancellationToken = default(CancellationToken))
         {
-            _logger.Debug("Stopping transport of {Peer}.", AsPeer);
-            _swarmCancellationTokenSource.Cancel();
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TestTransport));
+            }
+
+            if (Running)
+            {
+                _logger.Debug("Stopping transport of {Peer}.", AsPeer);
+                _swarmCancellationTokenSource.Cancel();
+                Running = false;
+            }
+
             await Task.Delay(waitFor, cancellationToken);
         }
+
+        /// <inheritdoc cref="ITransport.WaitForRunningAsync"/>
+        public Task WaitForRunningAsync() => _runningEvent.Task;
 
         public async Task BootstrapAsync(
             IEnumerable<Peer> bootstrapPeers,
@@ -126,6 +166,11 @@ namespace Libplanet.Tests.Net.Protocols
             int depth = 3,
             CancellationToken cancellationToken = default(CancellationToken))
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TestTransport));
+            }
+
             IEnumerable<BoundPeer> peers = bootstrapPeers.OfType<BoundPeer>();
 
             await BootstrapAsync(
@@ -144,9 +189,14 @@ namespace Libplanet.Tests.Net.Protocols
             int depth = 3,
             CancellationToken cancellationToken = default(CancellationToken))
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TestTransport));
+            }
+
             if (!Running)
             {
-                throw new SwarmException("Start swarm before use.");
+                throw new TransportException("Start transport before use.");
             }
 
             if (bootstrapPeers is null)
@@ -177,9 +227,14 @@ namespace Libplanet.Tests.Net.Protocols
             TimeSpan? timeout,
             CancellationToken cancellationToken = default(CancellationToken))
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TestTransport));
+            }
+
             if (!Running)
             {
-                throw new SwarmException("Start swarm before use.");
+                throw new TransportException("Start transport before use.");
             }
 
             if (peers is null)
@@ -239,9 +294,14 @@ namespace Libplanet.Tests.Net.Protocols
 
         public void SendPing(Peer target, TimeSpan? timeSpan = null)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TestTransport));
+            }
+
             if (!Running)
             {
-                throw new SwarmException("Start swarm before use.");
+                throw new TransportException("Start transport before use.");
             }
 
             if (!(target is BoundPeer boundPeer))
@@ -260,9 +320,14 @@ namespace Libplanet.Tests.Net.Protocols
 
         public void BroadcastTestMessage(Address? except, string data)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TestTransport));
+            }
+
             if (!Running)
             {
-                throw new SwarmException("Start swarm before use.");
+                throw new TransportException("Start transport before use.");
             }
 
             var message = new TestMessage(data) { Remote = AsPeer };
@@ -272,6 +337,11 @@ namespace Libplanet.Tests.Net.Protocols
 
         public void BroadcastMessage(Address? except, Message message)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TestTransport));
+            }
+
             var peers = Table.PeersToBroadcast(except);
             var peersString = string.Join(", ", peers.Select(peer => peer.Address));
             _logger.Debug(
@@ -297,9 +367,14 @@ namespace Libplanet.Tests.Net.Protocols
             TimeSpan? timeout,
             CancellationToken cancellationToken)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TestTransport));
+            }
+
             if (!Running)
             {
-                throw new SwarmException("Start swarm before use.");
+                throw new TransportException("Start transport before use.");
             }
 
             if (!(peer is BoundPeer boundPeer))
@@ -353,6 +428,7 @@ namespace Libplanet.Tests.Net.Protocols
                     message.Identity);
                 LastMessageTimestamp = DateTimeOffset.UtcNow;
                 ReceivedMessages.Add(reply);
+                MessageHistory.Enqueue(reply);
                 MessageReceived.Set();
                 return reply;
             }
@@ -379,30 +455,37 @@ namespace Libplanet.Tests.Net.Protocols
             };
         }
 
-        public void ReplyMessage(Message message)
+        public async Task ReplyMessageAsync(Message message, CancellationToken cancellationToken)
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TestTransport));
+            }
+
             if (!Running)
             {
-                throw new SwarmException("Start swarm before use.");
+                throw new TransportException("Start transport before use.");
             }
 
             _logger.Debug("Replying {Message}...", message);
             message.Remote = AsPeer;
-            Task.Run(async () =>
-            {
-                await Task.Delay(_networkDelay);
-                _transports[_peersToReply[message.Identity]].ReceiveReply(message);
-                _peersToReply.TryRemove(message.Identity, out Address addr);
-            });
+            await Task.Delay(_networkDelay, cancellationToken);
+            _transports[_peersToReply[message.Identity]].ReceiveReply(message);
+            _peersToReply.TryRemove(message.Identity, out Address addr);
         }
 
         public async Task WaitForTestMessageWithData(
             string data,
             CancellationToken token = default(CancellationToken))
         {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(TestTransport));
+            }
+
             if (!Running)
             {
-                throw new SwarmException("Start swarm before use.");
+                throw new TransportException("Start transport before use.");
             }
 
             while (!token.IsCancellationRequested && !ReceivedTestMessageOfData(data))
@@ -413,9 +496,9 @@ namespace Libplanet.Tests.Net.Protocols
 
         public bool ReceivedTestMessageOfData(string data)
         {
-            if (!Running)
+            if (_disposed)
             {
-                throw new SwarmException("Start swarm before use.");
+                throw new ObjectDisposedException(nameof(TestTransport));
             }
 
             return ReceivedMessages.OfType<TestMessage>().Any(msg => msg.Data == data);
@@ -433,6 +516,7 @@ namespace Libplanet.Tests.Net.Protocols
                 throw new ArgumentException("Sender of message is not a BoundPeer.");
             }
 
+            MessageHistory.Enqueue(message);
             if (message is TestMessage testMessage)
             {
                 if (_ignoreTestMessageWithData.Contains(testMessage.Data))
@@ -455,18 +539,9 @@ namespace Libplanet.Tests.Net.Protocols
                 _peersToReply[message.Identity] = boundPeer.Address;
             }
 
-            if (message is Ping)
-            {
-                ReplyMessage(new Pong
-                {
-                    Identity = message.Identity,
-                    Remote = AsPeer,
-                });
-            }
-
             LastMessageTimestamp = DateTimeOffset.UtcNow;
             ReceivedMessages.Add(message);
-            ProcessMessageHandler?.Invoke(this, message);
+            _ = ProcessMessageHandler.InvokeAsync(message);
             MessageReceived.Set();
         }
 
