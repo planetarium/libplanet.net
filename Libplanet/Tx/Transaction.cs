@@ -415,7 +415,120 @@ namespace Libplanet.Tx
                 throw new ArgumentNullException(nameof(privateKey));
             }
 
-            PublicKey publicKey = privateKey.PublicKey;
+            Transaction<T> unsignedTransaction = CreateUnsigned(
+                nonce,
+                privateKey.PublicKey,
+                genesisHash,
+                actions,
+                updatedAddresses,
+                timestamp);
+            byte[] payload = unsignedTransaction.Serialize(false);
+            byte[] sig = privateKey.Sign(payload);
+            return new Transaction<T>(
+                unsignedTransaction.Nonce,
+                unsignedTransaction.Signer,
+                unsignedTransaction.PublicKey,
+                unsignedTransaction.GenesisHash,
+                unsignedTransaction.UpdatedAddresses,
+                unsignedTransaction.Timestamp,
+                unsignedTransaction.Actions,
+                sig);
+        }
+
+        /// <summary>
+        /// A fa&#xe7;ade factory to create a new <see cref="Transaction{T}"/>.
+        /// Unlike the <see cref="Transaction(long, Address, PublicKey, BlockHash?,
+        /// IImmutableSet{Address}, DateTimeOffset, IEnumerable{T}, byte[])"/>
+        /// constructor, it automatically fills the following values from:
+        /// <list type="table">
+        /// <listheader>
+        /// <term>Property</term>
+        /// <description>Parameter the filled value derived from</description>
+        /// </listheader>
+        /// <item>
+        /// <term><see cref="Signer"/></term>
+        /// <description><paramref name="publicKey"/></description>
+        /// </item>
+        /// <item>
+        /// <term><see cref="PublicKey"/></term>
+        /// <description><paramref name="publicKey"/></description>
+        /// </item>
+        /// <item>
+        /// <term><see cref="UpdatedAddresses"/></term>
+        /// <description><paramref name="actions"/> and
+        /// <paramref name="updatedAddresses"/></description>
+        /// </item>
+        /// </list>
+        /// </summary>
+        /// <remarks>
+        /// This factory method tries its best to fill the <see
+        /// cref="UpdatedAddresses"/> property by actually evaluating
+        /// the given <paramref name="actions"/> (we call it &#x201c;rehearsal
+        /// mode&#x201d;), but remember that its result
+        /// is approximated in some degree, because the result of
+        /// <paramref name="actions"/> are not deterministic until
+        /// the <see cref="Transaction{T}"/> belongs to a <see
+        /// cref="Libplanet.Blocks.Block{T}"/>.
+        /// <para>If an <see cref="IAction"/> depends on previous states or
+        /// some randomness to determine what <see cref="Address"/> to update,
+        /// the automatically filled <see cref="UpdatedAddresses"/> became
+        /// mismatched from the <see cref="Address"/>es
+        /// <paramref name="actions"/> actually update after
+        /// a <see cref="Libplanet.Blocks.Block{T}"/> is mined.
+        /// Although such case would be rare, a programmer could manually give
+        /// the <paramref name="updatedAddresses"/> parameter
+        /// the <see cref="Address"/>es they predict to be updated.</para>
+        /// <para>If an <see cref="IAction"/> oversimplifies the assumption
+        /// about the <see cref="Libplanet.Blocks.Block{T}"/> it belongs to,
+        /// runtime exceptions could be thrown from this factory method.
+        /// The best solution to that is not to oversimplify things,
+        /// there is an option to check <see cref="IActionContext"/>'s
+        /// <see cref="IActionContext.Rehearsal"/> is <c>true</c> and
+        /// a conditional logic for the case.</para>
+        /// </remarks>
+        /// <param name="nonce">The number of previous
+        /// <see cref="Transaction{T}"/>s committed by the <see cref="Signer"/>
+        /// of this transaction.  This goes to the
+        /// <see cref="Transaction{T}.Nonce"/> property.</param>
+        /// <param name="publicKey">A <see cref="PublicKey"/> of the account
+        /// who creates a new transaction.  This key is used to fill
+        /// the <see cref="Signer"/> and <see cref="PublicKey"/> properties,
+        /// but this in itself is not included in the transaction.</param>
+        /// <param name="genesisHash">A <see cref="HashDigest{SHA256}"/> value
+        /// of the genesis which this <see cref="Transaction{T}"/> is made from.
+        /// This can be <c>null</c> iff the transaction is contained
+        /// in the genesis block.
+        /// </param>
+        /// <param name="actions">A list of <see cref="IAction"/>s.  This
+        /// can be empty, but cannot be <c>null</c>.  This goes to
+        /// the <see cref="Actions"/> property, and <see cref="IAction"/>s
+        /// are evaluated before a <see cref="Transaction{T}"/> is created
+        /// in order to fill the <see cref="UpdatedAddresses"/>.  See also
+        /// <em>Remarks</em> section.</param>
+        /// <param name="updatedAddresses"><see cref="Address"/>es whose
+        /// states affected by <paramref name="actions"/>.
+        /// These <see cref="Address"/>es are also included in
+        /// the <see cref="UpdatedAddresses"/> property, besides
+        /// <see cref="Address"/>es projected by evaluating
+        /// <paramref name="actions"/>.  See also <em>Remarks</em> section.
+        /// </param>
+        /// <param name="timestamp">The time this <see cref="Transaction{T}"/>
+        /// is created.  This goes to the <see cref="Timestamp"/>
+        /// property.  If <c>null</c> (which is default) is passed this will
+        /// be the current time.</param>
+        /// <returns>A created new <see cref="Transaction{T}"/> unsigned.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <c>null</c>
+        /// is passed to <paramref name="actions"/>.
+        /// </exception>
+        public static Transaction<T> CreateUnsigned(
+            long nonce,
+            PublicKey publicKey,
+            BlockHash? genesisHash,
+            IEnumerable<T> actions,
+            IImmutableSet<Address> updatedAddresses = null,
+            DateTimeOffset? timestamp = null
+        )
+        {
             var signer = new Address(publicKey);
 
             if (ReferenceEquals(updatedAddresses, null))
@@ -426,16 +539,6 @@ namespace Libplanet.Tx
             DateTimeOffset ts = timestamp ?? DateTimeOffset.UtcNow;
 
             ImmutableArray<T> actionsArray = actions.ToImmutableArray();
-            byte[] payload = new Transaction<T>(
-                nonce,
-                signer,
-                publicKey,
-                genesisHash,
-                updatedAddresses,
-                ts,
-                actionsArray
-            ).Serialize(false);
-
             if (!actionsArray.IsEmpty)
             {
                 // FIXME: Although we are assuming all block hashes are SHA256 digest, we should
@@ -465,19 +568,9 @@ namespace Libplanet.Tx
                 {
                     updatedAddresses =
                         updatedAddresses.Union(delta.UpdatedAddresses);
-                    payload = new Transaction<T>(
-                        nonce,
-                        signer,
-                        publicKey,
-                        genesisHash,
-                        updatedAddresses,
-                        ts,
-                        actionsArray
-                    ).Serialize(false);
                 }
             }
 
-            byte[] sig = privateKey.Sign(payload);
             return new Transaction<T>(
                 nonce,
                 signer,
@@ -485,9 +578,7 @@ namespace Libplanet.Tx
                 genesisHash,
                 updatedAddresses,
                 ts,
-                actionsArray,
-                sig
-            );
+                actionsArray);
         }
 
         /// <summary>
@@ -678,7 +769,7 @@ namespace Libplanet.Tx
         /// <see cref="Transaction{T}.PublicKey"/>.</exception>
         public void Validate()
         {
-            if (!PublicKey.Verify(Serialize(false), Signature))
+            if (Signature.Length == 0 || !PublicKey.Verify(Serialize(false), Signature))
             {
                 string message =
                     $"The signature ({ByteUtil.Hex(Signature)}) is failed " +

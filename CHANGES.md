@@ -191,6 +191,7 @@ To be released.
  -  Added `Address(Binary)` overloaded constructor.  [[#1289]]
  -  Added `Currency(IValue)` overloaded constructor.  [[#1289]]
  -  Added `Currency.Serialize()` method.  [[#1289]]
+ -  Added `Transaction<T>.CreateUnsigned()` method.  [[#1378]]
 
 ### Behavioral changes
 
@@ -214,6 +215,8 @@ To be released.
  -  (Libplanet.RocksDBStore) `RocksDBStore.ForkBlockIndexes()` became to share
     common ancestors between forks rather than duplicating them so that much
     less space is used.  [[#1280], [#1287]]
+ -  `Transaction<T>.Validate()` became to throw `InvalidTxSignatureException`
+    if the transaction was not signed.  [[#1378]]
 
 ### Bug fixes
 
@@ -297,6 +300,7 @@ To be released.
 [#1343]: https://github.com/planetarium/libplanet/pull/1343
 [#1348]: https://github.com/planetarium/libplanet/pull/1348
 [#1351]: https://github.com/planetarium/libplanet/pull/1351
+[#1378]: https://github.com/planetarium/libplanet/pull/1378
 
 
 Version 0.11.1
