@@ -284,6 +284,7 @@ To be released.
     updated cached peers multiple times.  [[#1219]]
  -  Fixed memory leak due to undisposed `CancellationTokenRegistration`s.
     [[#1228]]
+ -  Fixed memory leak due to undisposed TCP relay clients.  [[#1236]]
  -  Fixed a bug where `DefaultStore.Dispose()` and `TrieStateStore.Dispose()`
     had not been idempotent.  [[#1272]]
  -  (Libplanet.RocksDBStore) Fixed a bug where `RocksDBStore.Dispose()`,
@@ -329,6 +330,7 @@ To be released.
 [#1230]: https://github.com/planetarium/libplanet/issues/1230
 [#1234]: https://github.com/planetarium/libplanet/pull/1234
 [#1235]: https://github.com/planetarium/libplanet/pull/1235
+[#1236]: https://github.com/planetarium/libplanet/pull/1236
 [#1240]: https://github.com/planetarium/libplanet/pull/1240
 [#1242]: https://github.com/planetarium/libplanet/pull/1242
 [#1265]: https://github.com/planetarium/libplanet/pull/1265

@@ -23,7 +23,6 @@ namespace Libplanet.Stun
         private static readonly TimeSpan TurnAllocationLifetime = TimeSpan.FromSeconds(777);
         private readonly string _host;
         private readonly int _port;
-        private readonly IList<TcpClient> _relayedClients;
         private readonly IDictionary<byte[], TaskCompletionSource<StunMessage>>
             _responses;
 
@@ -46,7 +45,6 @@ namespace Libplanet.Stun
             Username = username;
             Password = password;
 
-            _relayedClients = new List<TcpClient>();
             _connectionAttempts =
                 new AsyncProducerConsumerQueue<ConnectionAttempt>();
             _responses =
@@ -126,7 +124,7 @@ namespace Libplanet.Stun
 
         public async Task<IPEndPoint> AllocateRequestAsync(
             TimeSpan lifetime,
-            CancellationToken cancellationToken = default(CancellationToken))
+            CancellationToken cancellationToken = default)
         {
             NetworkStream stream = _control.GetStream();
             StunMessage response;
@@ -159,7 +157,7 @@ namespace Libplanet.Stun
 
         public async Task CreatePermissionAsync(
             IPEndPoint peerAddress,
-            CancellationToken cancellationToken = default(CancellationToken))
+            CancellationToken cancellationToken = default)
         {
             NetworkStream stream = _control.GetStream();
             var request = new CreatePermissionRequest(peerAddress);
@@ -176,8 +174,8 @@ namespace Libplanet.Stun
             }
         }
 
-        public async Task<NetworkStream> AcceptRelayedStreamAsync(
-            CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<(TcpClient, NetworkStream)> AcceptRelayedStreamAsync(
+            CancellationToken cancellationToken = default)
         {
             while (true)
             {
@@ -187,7 +185,6 @@ namespace Libplanet.Stun
                 byte[] id = attempt.ConnectionId;
                 var bindRequest = new ConnectionBindRequest(id);
                 var relayedClient = new TcpClient(_host, _port);
-                _relayedClients.Add(relayedClient);
                 NetworkStream relayedStream = relayedClient.GetStream();
 
                 try
@@ -198,9 +195,11 @@ namespace Libplanet.Stun
 
                     if (bindResponse is ConnectionBindSuccessResponse)
                     {
-                        return relayedStream;
+                        return (relayedClient, relayedStream);
                     }
 
+                    relayedStream.Dispose();
+                    relayedClient.Dispose();
                     throw new TurnClientException("ConnectionBind failed.", bindResponse);
                 }
                 catch (IOException e)
@@ -209,12 +208,15 @@ namespace Libplanet.Stun
                         e,
                         "The connection seems to disconnect before parsing; ignored."
                     );
+
+                    relayedStream.Dispose();
+                    relayedClient.Dispose();
                 }
             }
         }
 
         public async Task<IPEndPoint> GetMappedAddressAsync(
-            CancellationToken cancellationToken = default(CancellationToken))
+            CancellationToken cancellationToken = default)
         {
             NetworkStream stream = _control.GetStream();
             var request = new BindingRequest();
@@ -236,7 +238,7 @@ namespace Libplanet.Stun
 
         public async Task<TimeSpan> RefreshAllocationAsync(
             TimeSpan lifetime,
-            CancellationToken cancellationToken = default(CancellationToken))
+            CancellationToken cancellationToken = default)
         {
             NetworkStream stream = _control.GetStream();
             var request = new RefreshRequest((int)lifetime.TotalSeconds);
@@ -261,15 +263,13 @@ namespace Libplanet.Stun
             throw new TurnClientException("RefreshRequest failed.", response);
         }
 
-        public async Task<bool> IsBehindNAT(
-            CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<bool> IsBehindNAT(CancellationToken cancellationToken = default)
         {
             IPEndPoint mapped = await GetMappedAddressAsync(cancellationToken);
             return !_control.Client.LocalEndPoint.Equals(mapped);
         }
 
-        public async Task<bool> IsConnectable(
-            CancellationToken cancellationToken = default(CancellationToken))
+        public async Task<bool> IsConnectable(CancellationToken cancellationToken = default)
         {
             try
             {
@@ -299,9 +299,7 @@ namespace Libplanet.Stun
             _logger.Debug($"{nameof(TurnClient)} is disposed.");
         }
 
-        public async Task BindProxies(
-            int listenPort,
-            CancellationToken cancellationToken = default(CancellationToken))
+        public async Task BindProxies(int listenPort, CancellationToken cancellationToken = default)
         {
             while (!cancellationToken.IsCancellationRequested)
             {
@@ -310,7 +308,8 @@ namespace Libplanet.Stun
                 tcpClient.Connect(new IPEndPoint(IPAddress.Loopback, listenPort));
 #pragma warning restore PC001
                 NetworkStream localStream = tcpClient.GetStream();
-                NetworkStream turnStream = await AcceptRelayedStreamAsync(cancellationToken);
+                (TcpClient relayedClient, NetworkStream turnStream) =
+                    await AcceptRelayedStreamAsync(cancellationToken);
 #pragma warning disable CS4014
 
                 const int bufferSize = 8042;
@@ -323,6 +322,7 @@ namespace Libplanet.Stun
                         turnStream.Dispose();
                         localStream.Dispose();
                         tcpClient.Dispose();
+                        relayedClient.Dispose();
                     },
                     cancellationToken
                 );
@@ -333,7 +333,7 @@ namespace Libplanet.Stun
         private List<Task> BindMultipleProxies(
             int listenPort,
             int count,
-            CancellationToken cancellationToken = default(CancellationToken))
+            CancellationToken cancellationToken = default)
         {
             return Enumerable.Range(1, count)
                 .Select(x => BindProxies(listenPort, cancellationToken))
@@ -349,7 +349,7 @@ namespace Libplanet.Stun
                 {
                     await Task.Delay(lifetime - TimeSpan.FromMinutes(1), cancellationToken);
                     _logger.Debug("Refreshing TURN allocation...");
-                    lifetime = await RefreshAllocationAsync(lifetime);
+                    lifetime = await RefreshAllocationAsync(lifetime, cancellationToken);
                     cancellationToken.ThrowIfCancellationRequested();
                 }
                 catch (OperationCanceledException e)
@@ -447,11 +447,6 @@ namespace Libplanet.Stun
             _turnTaskCts.Dispose();
             _turnTasks.Clear();
             ClearResponses();
-
-            foreach (TcpClient relays in _relayedClients)
-            {
-                relays.Dispose();
-            }
         }
 
         private void ClearResponses()
