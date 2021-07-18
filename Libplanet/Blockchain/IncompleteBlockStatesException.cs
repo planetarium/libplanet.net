@@ -5,9 +5,9 @@ using Libplanet.Blocks;
 namespace Libplanet.Blockchain
 {
     /// <summary>
-    /// The exception that is thrown when a <see cref="BlockChain{T}"/> have
-    /// not calculated the complete states for all blocks, but an operation
-    /// that needs some lacked states is requested.
+    /// An exception thrown when a <see cref="BlockChain{T}"/> have
+    /// not calculated the complete states for all blocks but an operation
+    /// is requested that requires the missing states.
     /// </summary>
     public class IncompleteBlockStatesException : Exception
     {
@@ -15,7 +15,7 @@ namespace Libplanet.Blockchain
         /// Creates a new <see cref="IncompleteBlockStatesException"/> object.
         /// </summary>
         /// <param name="blockHash">Specifies <see cref="BlockHash"/>.
-        /// It is automatically included to the <see cref="Exception.Message"/>
+        /// It is automatically included in the <see cref="Exception.Message"/>
         /// string.</param>
         /// <param name="message">Specifies the <see cref="Exception.Message"/>.
         /// </param>
