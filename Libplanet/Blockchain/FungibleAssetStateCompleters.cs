@@ -28,6 +28,18 @@ namespace Libplanet.Blockchain
                 return blockChain.GetBalance(address, currency, blockHash);
             };
 
+        public static readonly FungibleAssetStateCompleter<T> FullComplement =
+            (blockChain, blockHash, address, currency) =>
+        {
+            throw new NotImplementedException("Placeholder.");
+        };
+
+        public static readonly FungibleAssetStateCompleter<T> TailComplement =
+            (blockChain, blockHash, address, currency) =>
+        {
+            throw new NotImplementedException("Placeholder.");
+        };
+
         /// <summary>
         /// Rejects to complement incomplete state and throws
         /// an <see cref="IncompleteBlockStatesException"/>.

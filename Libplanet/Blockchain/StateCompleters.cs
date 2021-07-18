@@ -25,6 +25,24 @@ namespace Libplanet.Blockchain
         };
 
         /// <summary>
+        /// Complements the entire chain on the fly.
+        /// </summary>
+        public static readonly StateCompleter<T> FullComplement =
+            (blockChain, blockHash, address) =>
+        {
+            throw new NotImplementedException("Placeholder.");
+        };
+
+        /// <summary>
+        /// Complements the tail end of the chain on the fly.
+        /// </summary>
+        public static readonly StateCompleter<T> TailComplement =
+            (blockChain, blockHash, address) =>
+        {
+            throw new NotImplementedException("Placeholder.");
+        };
+
+        /// <summary>
         /// Rejects to complement incomplete state and throws
         /// an <see cref="IncompleteBlockStatesException"/>.
         /// </summary>

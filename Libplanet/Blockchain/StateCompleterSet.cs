@@ -21,6 +21,18 @@ namespace Libplanet.Blockchain
             FungibleAssetStateCompleter = FungibleAssetStateCompleters<T>.Recalculate,
         };
 
+        public static readonly StateCompleterSet<T> FullComplement = new StateCompleterSet<T>
+        {
+            StateCompleter = StateCompleters<T>.FullComplement,
+            FungibleAssetStateCompleter = FungibleAssetStateCompleters<T>.FullComplement,
+        };
+
+        public static readonly StateCompleterSet<T> TailComplement = new StateCompleterSet<T>
+        {
+            StateCompleter = StateCompleters<T>.TailComplement,
+            FungibleAssetStateCompleter = FungibleAssetStateCompleters<T>.TailComplement,
+        };
+
         /// <summary>
         /// Rejects to complement incomplete state and throws
         /// an <see cref="IncompleteBlockStatesException"/>.
