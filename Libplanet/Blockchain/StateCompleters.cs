@@ -15,9 +15,7 @@ namespace Libplanet.Blockchain
         where T : IAction, new()
     {
         /// <summary>
-        /// Recalculates and complements a block's incomplete states on the fly.
-        /// Incomplete states are filled with the recalculated states and the states are
-        /// permanently remained in the store.
+        /// See <see cref="StateCompleterSet{T}.Recalculate"/>.
         /// </summary>
         public static readonly StateCompleter<T> Recalculate = (blockChain, blockHash, address) =>
         {
@@ -26,18 +24,18 @@ namespace Libplanet.Blockchain
         };
 
         /// <summary>
-        /// Complements the entire chain on the fly.
+        /// See <see cref="StateCompleterSet{T}.ComplementAll"/>.
         /// </summary>
-        public static readonly StateCompleter<T> FullComplement =
+        public static readonly StateCompleter<T> ComplementAll =
             (blockChain, blockHash, address) =>
         {
             throw new NotSupportedException("Placeholder.");
         };
 
         /// <summary>
-        /// Complements the tail end of the chain on the fly.
+        /// See <see cref="StateCompleterSet{T}.ComplementLatest"/>.
         /// </summary>
-        public static readonly StateCompleter<T> TailComplement =
+        public static readonly StateCompleter<T> ComplementLatest =
             (blockChain, blockHash, address) =>
         {
             throw new NotSupportedException("Placeholder.");

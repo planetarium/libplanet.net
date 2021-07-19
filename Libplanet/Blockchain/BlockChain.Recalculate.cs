@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Libplanet.Action;
 using Libplanet.Blocks;
@@ -9,8 +8,8 @@ namespace Libplanet.Blockchain
     public partial class BlockChain<T>
     {
         /// <summary>
-        /// Recalculates and rewrites <i>all</i> block states including and upto given
-        /// <paramref name="blockHash"/> starting from the genesis block.
+        /// Recalculates <i>all</i> block states and complements missing states including and upto
+        /// given <paramref name="blockHash"/> starting from the genesis block.
         /// </summary>
         /// <param name="blockHash">The inclusive limit of target hash to terminate recalculation.
         /// </param>
@@ -71,12 +70,12 @@ namespace Libplanet.Blockchain
         /// <para>
         /// Unlike <see cref="RecalculateBlockStates"/>, this method skips recalculations if states
         /// are found for intermediate blocks. This may not be fully secure if states for
-        /// blocks in <see cref="IStateStore"/> are already corrupted.
+        /// blocks in <see cref="IStateStore"/> are somehow corrupted.
         /// </para>
         /// </remarks>
-        internal void FullComplementBlockStates(BlockHash blockHash)
+        internal void ComplementAllBlockStates(BlockHash blockHash)
         {
-            _logger.Verbose("Complementing block states upto {BlockHash}...", blockHash);
+            _logger.Verbose("Complementing all block states upto {BlockHash}...", blockHash);
 
             // Prevent recursive trial to recalculate & complement incomplete block states by
             // mistake; if the below code works as intended, these state completers must never
@@ -120,9 +119,9 @@ namespace Libplanet.Blockchain
         /// for <paramref name="blockHash"/>.
         /// </summary>
         /// <param name="blockHash">The starting point for searching backwards.</param>
-        internal void TailComplementBlockStates(BlockHash blockHash)
+        internal void ComplementLatestBlockStates(BlockHash blockHash)
         {
-            _logger.Verbose("Complementing block states upto {BlockHash}...", blockHash);
+            _logger.Verbose("Complementing latest block states upto {BlockHash}...", blockHash);
 
             // Prevent recursive trial to recalculate & complement incomplete block states by
             // mistake; if the below code works as intended, these state completers must never
