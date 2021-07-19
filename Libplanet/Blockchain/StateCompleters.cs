@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Bencodex.Types;
 using Libplanet.Action;
@@ -20,7 +21,7 @@ namespace Libplanet.Blockchain
         /// </summary>
         public static readonly StateCompleter<T> Recalculate = (blockChain, blockHash, address) =>
         {
-            blockChain.ComplementBlockStates(blockHash);
+            blockChain.RecalculateBlockStates(blockHash);
             return blockChain.GetState(address, blockHash);
         };
 
@@ -30,7 +31,7 @@ namespace Libplanet.Blockchain
         public static readonly StateCompleter<T> FullComplement =
             (blockChain, blockHash, address) =>
         {
-            throw new NotImplementedException("Placeholder.");
+            throw new NotSupportedException("Placeholder.");
         };
 
         /// <summary>
@@ -39,7 +40,7 @@ namespace Libplanet.Blockchain
         public static readonly StateCompleter<T> TailComplement =
             (blockChain, blockHash, address) =>
         {
-            throw new NotImplementedException("Placeholder.");
+            throw new NotSupportedException("Placeholder.");
         };
 
         /// <summary>

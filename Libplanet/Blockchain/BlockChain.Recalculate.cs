@@ -1,8 +1,8 @@
+using System;
+using System.Collections.Generic;
 using Libplanet.Action;
 using Libplanet.Blocks;
 using Libplanet.Store;
-using System.Collections.Generic;
-using System;
 
 namespace Libplanet.Blockchain
 {
@@ -116,7 +116,7 @@ namespace Libplanet.Blockchain
 
         internal void TailComplementBlockStates(BlockHash blockHash)
         {
-            throw new NotImplementedException("Placeholder.");
+            throw new NotSupportedException("Placeholder.");
         }
     }
 }

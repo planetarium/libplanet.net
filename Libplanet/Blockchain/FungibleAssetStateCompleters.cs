@@ -24,20 +24,20 @@ namespace Libplanet.Blockchain
         public static readonly FungibleAssetStateCompleter<T> Recalculate =
             (blockChain, blockHash, address, currency) =>
             {
-                blockChain.ComplementBlockStates(blockHash);
+                blockChain.RecalculateBlockStates(blockHash);
                 return blockChain.GetBalance(address, currency, blockHash);
             };
 
         public static readonly FungibleAssetStateCompleter<T> FullComplement =
             (blockChain, blockHash, address, currency) =>
         {
-            throw new NotImplementedException("Placeholder.");
+            throw new NotSupportedException("Placeholder.");
         };
 
         public static readonly FungibleAssetStateCompleter<T> TailComplement =
             (blockChain, blockHash, address, currency) =>
         {
-            throw new NotImplementedException("Placeholder.");
+            throw new NotSupportedException("Placeholder.");
         };
 
         /// <summary>
