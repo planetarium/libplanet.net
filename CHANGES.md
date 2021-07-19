@@ -252,6 +252,8 @@ To be released.
  -  (Libplanet.RocksDBStore) `RocksDBStore.ForkBlockIndexes()` became to share
     common ancestors between forks rather than duplicating them so that much
     less space is used.  [[#1280], [#1287]]
+ -  `Swarm<T>.PreloadAsync()` now checks the existence of blocks in the storage
+    (was in the blockchain).  [[#1324]]
  -  `BlockChain<T>.Append()` cumulates indexes for pairs (TxId and BlockHash).
     A transaction inclusion for a block is retrievable by using this index.
     [[#1315], [#1329]]
@@ -355,6 +357,7 @@ To be released.
 [#1320]: https://github.com/planetarium/libplanet/issues/1320
 [#1325]: https://github.com/planetarium/libplanet/pull/1325
 [#1328]: https://github.com/planetarium/libplanet/pull/1328
+[#1324]: https://github.com/planetarium/libplanet/pull/1324
 [#1329]: https://github.com/planetarium/libplanet/pull/1329
 [#1334]: https://github.com/planetarium/libplanet/pull/1334
 [#1339]: https://github.com/planetarium/libplanet/issues/1339
