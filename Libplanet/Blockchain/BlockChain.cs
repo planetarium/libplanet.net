@@ -1992,46 +1992,6 @@ namespace Libplanet.Blockchain
             }
         }
 
-        /// <summary>
-        /// Calculates and complements a block's incomplete states on the fly.
-        /// </summary>
-        /// <param name="blockHash">The hash of a block which has incomplete states.</param>
-        internal void ComplementBlockStates(BlockHash blockHash)
-        {
-            _logger.Verbose("Recalculates the block {BlockHash}'s states...", blockHash);
-
-            // Prevent recursive trial to recalculate & complement incomplete block states by
-            // mistake; if the below code works as intended, these state completers must never
-            // be invoked.
-            StateCompleterSet<T> stateCompleters = StateCompleterSet<T>.Reject;
-
-            // Calculates and fills the incomplete states
-            // on the fly.
-            foreach (BlockHash hash in BlockHashes)
-            {
-                Block<T> block = this[hash];
-                if (StateStore.ContainsBlockStates(hash))
-                {
-                    continue;
-                }
-
-                IReadOnlyList<ActionEvaluation> evaluations = ActionEvaluator.Evaluate(
-                    block,
-                    stateCompleters
-                );
-
-                _rwlock.EnterWriteLock();
-                try
-                {
-                    SetStates(block, evaluations);
-                }
-                finally
-                {
-                    _rwlock.ExitWriteLock();
-                }
-            }
-        }
-
         private InvalidBlockException ValidateNextBlock(Block<T> nextBlock)
         {
             int actualProtocolVersion = nextBlock.ProtocolVersion;
