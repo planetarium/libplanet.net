@@ -231,6 +231,8 @@ To be released.
  -  Added `ByteUtil.Satisfies()` method.  [[#1314], [#1352]]
  -  Added `BlockChain<T>.ExecuteActions()` method.  [[#1368]]
  -  Added `SwarmOptions.MinimumBroadcastTarget` property.  [[#1379]]
+ -  Added `StateCompleterSet<T>.ComplementAll` property.  [[#1386]]
+ -  Added `StateCompleterSet<T>.ComplementLatest` property.  [[#1386]]
 
 ### Behavioral changes
 
@@ -261,6 +263,9 @@ To be released.
     if `OutOfMemoryException` is caught from `IAction.Execute()`.
     [[#1320], [#1343]]
  -  Improved performance of broadcasting using `Swarm<T>`.  [[#1334]]
+ -  `StateCompleterSet<T>.Recalculate` now evaluates states even for those
+    already in `IStateStore`.  Moreover, it also terminates early if possible
+    after reaching the `BlockHash` provided with a call.  [[#1386]]
 
 ### Bug fixes
 
@@ -373,6 +378,7 @@ To be released.
 [#1360]: https://github.com/planetarium/libplanet/pull/1360
 [#1368]: https://github.com/planetarium/libplanet/pull/1368
 [#1379]: https://github.com/planetarium/libplanet/pull/1379
+[#1386]: https://github.com/planetarium/libplanet/pull/1386
 
 
 Version 0.11.1
