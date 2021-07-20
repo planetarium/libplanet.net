@@ -265,7 +265,7 @@ To be released.
  -  Improved performance of broadcasting using `Swarm<T>`.  [[#1334]]
  -  `StateCompleterSet<T>.Recalculate` now evaluates states even for those
     already in `IStateStore`.  Moreover, it also terminates early if possible
-    after reaching the `BlockHash` provided with a call.  [[#1386]]
+    after reaching the `BlockHash` provided with a call.  [[#1358], [#1386]]
 
 ### Bug fixes
 
@@ -375,6 +375,7 @@ To be released.
 [#1351]: https://github.com/planetarium/libplanet/pull/1351
 [#1352]: https://github.com/planetarium/libplanet/pull/1352
 [#1353]: https://github.com/planetarium/libplanet/pull/1353
+[#1358]: https://github.com/planetarium/libplanet/issues/1358
 [#1360]: https://github.com/planetarium/libplanet/pull/1360
 [#1368]: https://github.com/planetarium/libplanet/pull/1368
 [#1379]: https://github.com/planetarium/libplanet/pull/1379
