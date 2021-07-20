@@ -125,7 +125,7 @@ on GitHub consists of several projects:
  -  *Libplanet.Analyzers.Tests*: Unit tests of the *Libplanet.Analyzers*
     project.
 
- -  *Libplanet.Explorer.UnitTests*: Unit tests of the *Libplanet.Explorer*
+ -  *Libplanet.Explorer.Tests*: Unit tests of the *Libplanet.Explorer*
     project.
 
  -  *Libplanet.Extensions.Cocona.Tests*: Unit tests of the

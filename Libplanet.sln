@@ -27,7 +27,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Libplanet.Explorer", "Libpl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Libplanet.Explorer.Executable", "Libplanet.Explorer.Executable\Libplanet.Explorer.Executable.csproj", "{BEDBC0F8-AD0A-44C3-9A53-C8EC4E631AF4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Libplanet.Explorer.UnitTests", "Libplanet.Explorer.UnitTests\Libplanet.Explorer.UnitTests.csproj", "{48A7AC8E-2CB5-403B-8A18-11F493079619}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Libplanet.Explorer.Tests", "Libplanet.Explorer.Tests\Libplanet.Explorer.Tests.csproj", "{48A7AC8E-2CB5-403B-8A18-11F493079619}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Libplanet.Extensions.Cocona", "Libplanet.Extensions.Cocona\Libplanet.Extensions.Cocona.csproj", "{B3170309-55AB-462C-9100-D77107799E82}"
 EndProject

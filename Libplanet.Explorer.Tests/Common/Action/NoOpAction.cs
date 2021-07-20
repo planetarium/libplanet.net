@@ -1,7 +1,7 @@
 using Bencodex.Types;
 using Libplanet.Action;
 
-namespace Libplanet.Explorer.UnitTests.Common.Action
+namespace Libplanet.Explorer.Tests.Common.Action
 {
     public class NoOpAction : IAction
     {

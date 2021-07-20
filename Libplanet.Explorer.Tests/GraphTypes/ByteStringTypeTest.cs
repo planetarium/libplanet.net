@@ -2,7 +2,7 @@ using GraphQL.Language.AST;
 using Libplanet.Explorer.GraphTypes;
 using Xunit;
 
-namespace Libplanet.Explorer.UnitTests.GraphTypes
+namespace Libplanet.Explorer.Tests.GraphTypes
 {
     public class ByteStringTypeTest : ScalarGraphTypeTestBase<ByteStringType>
     {

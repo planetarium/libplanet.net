@@ -7,12 +7,12 @@ using GraphQL.Types;
 using Libplanet.Blocks;
 using Libplanet.Crypto;
 using Libplanet.Explorer.GraphTypes;
-using Libplanet.Explorer.UnitTests.Common.Action;
+using Libplanet.Explorer.Tests.Common.Action;
 using Libplanet.Tx;
 using Xunit;
-using static Libplanet.Explorer.UnitTests.GraphQLTestUtils;
+using static Libplanet.Explorer.Tests.GraphQLTestUtils;
 
-namespace Libplanet.Explorer.UnitTests.GraphTypes
+namespace Libplanet.Explorer.Tests.GraphTypes
 {
     // TODO: test `blockRef`.
     public class TransactionTypeTest
