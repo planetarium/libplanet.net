@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using Libplanet.Action;
 using Libplanet.Blocks;
 using Libplanet.Crypto;
 using Libplanet.Net;
@@ -158,7 +159,7 @@ namespace Libplanet.Explorer.Executable
 
         public string GenesisBlockPath { get; set; }
 
-        internal Block<Program.AppAgnosticAction> GenesisBlock
+        internal Block<NullAction> GenesisBlock
         {
             get
             {
@@ -166,7 +167,7 @@ namespace Libplanet.Explorer.Executable
                 using (var client = new WebClient())
                 {
                     var serialized = client.DownloadData(uri);
-                    return Block<Program.AppAgnosticAction>.Deserialize(serialized);
+                    return Block<NullAction>.Deserialize(serialized);
                 }
             }
         }

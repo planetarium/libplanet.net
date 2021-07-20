@@ -184,12 +184,12 @@ If omitted (default) explorer only the local blockchain store.")]
                 store.UnstageTransactionIds(pendingTxs);
                 Log.Debug("Pending txs unstaged. [{PendingCount}] in store.", pendingTxs.Count);
 
-                IBlockPolicy<AppAgnosticAction> policy =
-                    new DumbBlockPolicy(LoadBlockPolicy<AppAgnosticAction>(options));
-                IStagePolicy<AppAgnosticAction> stagePolicy =
-                    new VolatileStagePolicy<AppAgnosticAction>();
+                IBlockPolicy<NullAction> policy =
+                    new DumbBlockPolicy(LoadBlockPolicy<NullAction>(options));
+                IStagePolicy<NullAction> stagePolicy =
+                    new VolatileStagePolicy<NullAction>();
                 var blockChain =
-                    new BlockChain<AppAgnosticAction>(
+                    new BlockChain<NullAction>(
                         policy,
                         stagePolicy,
                         store,
@@ -200,12 +200,12 @@ If omitted (default) explorer only the local blockchain store.")]
                 Startup.StoreSingleton = store;
 
                 IWebHost webHost = WebHost.CreateDefaultBuilder()
-                    .UseStartup<ExplorerStartup<AppAgnosticAction, Startup>>()
+                    .UseStartup<ExplorerStartup<NullAction, Startup>>()
                     .UseSerilog()
                     .UseUrls($"http://{options.Host}:{options.Port}/")
                     .Build();
 
-                Swarm<AppAgnosticAction> swarm = null;
+                Swarm<NullAction> swarm = null;
                 if (!(options.Seeds is null))
                 {
                     string aggregatedSeedStrings =
@@ -236,7 +236,7 @@ If omitted (default) explorer only the local blockchain store.")]
                         MaxTimeout = TimeSpan.FromSeconds(10),
                     };
 
-                    swarm = new Swarm<AppAgnosticAction>(
+                    swarm = new Swarm<NullAction>(
                         blockChain,
                         privateKey,
                         options.AppProtocolVersionToken is string t
@@ -358,7 +358,7 @@ If omitted (default) explorer only the local blockchain store.")]
         }
 
         private static async Task StartSwarmAsync(
-            Swarm<AppAgnosticAction> swarm,
+            Swarm<NullAction> swarm,
             IEnumerable<Peer> seeds,
             CancellationToken cancellationToken)
         {
@@ -394,11 +394,11 @@ If omitted (default) explorer only the local blockchain store.")]
             await swarm.StartAsync(cancellationToken: cancellationToken);
         }
 
-        internal class DumbBlockPolicy : IBlockPolicy<AppAgnosticAction>
+        internal class DumbBlockPolicy : IBlockPolicy<NullAction>
         {
-            private readonly IBlockPolicy<AppAgnosticAction> _impl;
+            private readonly IBlockPolicy<NullAction> _impl;
 
-            public DumbBlockPolicy(BlockPolicy<AppAgnosticAction> blockPolicy)
+            public DumbBlockPolicy(BlockPolicy<NullAction> blockPolicy)
             {
                 _impl = blockPolicy;
             }
@@ -411,7 +411,7 @@ If omitted (default) explorer only the local blockchain store.")]
                 _impl.CanonicalChainComparer;
 
             public bool DoesTransactionFollowsPolicy(
-                Transaction<AppAgnosticAction> transaction, BlockChain<AppAgnosticAction> blockChain
+                Transaction<NullAction> transaction, BlockChain<NullAction> blockChain
             )
             {
                 return _impl.DoesTransactionFollowsPolicy(transaction, blockChain);
@@ -422,13 +422,13 @@ If omitted (default) explorer only the local blockchain store.")]
                 return _impl.GetMaxBlockBytes(index);
             }
 
-            public long GetNextBlockDifficulty(BlockChain<AppAgnosticAction> blocks)
+            public long GetNextBlockDifficulty(BlockChain<NullAction> blocks)
             {
                 return 0;
             }
 
             public InvalidBlockException ValidateNextBlock(
-                BlockChain<AppAgnosticAction> blocks, Block<AppAgnosticAction> nextBlock
+                BlockChain<NullAction> blocks, Block<NullAction> nextBlock
             )
             {
                 return _impl.ValidateNextBlock(blocks, nextBlock);
@@ -438,57 +438,17 @@ If omitted (default) explorer only the local blockchain store.")]
                 _impl.GetHashAlgorithm(index);
         }
 
-        internal class AppAgnosticAction : IAction
-        {
-            public IValue PlainValue
-            {
-                get;
-                private set;
-            }
-
-            public void LoadPlainValue(
-                IValue plainValue)
-            {
-                PlainValue = plainValue;
-            }
-
-            public IAccountStateDelta Execute(IActionContext context)
-            {
-                return context.PreviousStates;
-            }
-
-            public void Render(
-                IActionContext context,
-                IAccountStateDelta nextStates)
-            {
-            }
-
-            public void RenderError(IActionContext context, Exception exception)
-            {
-            }
-
-            public void Unrender(
-                IActionContext context,
-                IAccountStateDelta nextStates)
-            {
-            }
-
-            public void UnrenderError(IActionContext context, Exception exception)
-            {
-            }
-        }
-
-        internal class Startup : IBlockChainContext<AppAgnosticAction>
+        internal class Startup : IBlockChainContext<NullAction>
         {
             public bool Preloaded => PreloadedSingleton;
 
-            public BlockChain<AppAgnosticAction> BlockChain => BlockChainSingleton;
+            public BlockChain<NullAction> BlockChain => BlockChainSingleton;
 
             public IStore Store => StoreSingleton;
 
             internal static bool PreloadedSingleton { get; set; }
 
-            internal static BlockChain<AppAgnosticAction> BlockChainSingleton { get; set; }
+            internal static BlockChain<NullAction> BlockChainSingleton { get; set; }
 
             internal static IStore StoreSingleton { get; set; }
         }

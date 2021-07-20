@@ -8,7 +8,6 @@ using System.Numerics;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
-using Bencodex;
 using Bencodex.Types;
 using Libplanet.Action;
 using Libplanet.Assets;

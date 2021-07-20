@@ -4,9 +4,9 @@ using System.Collections.Immutable;
 using System.Security.Cryptography;
 using GraphQL;
 using GraphQL.Types;
+using Libplanet.Action;
 using Libplanet.Blocks;
 using Libplanet.Explorer.GraphTypes;
-using Libplanet.Explorer.UnitTests.Common.Action;
 using Libplanet.Tx;
 using Xunit;
 using static Libplanet.Explorer.UnitTests.GraphQLTestUtils;
@@ -18,7 +18,7 @@ namespace Libplanet.Explorer.UnitTests.GraphTypes
         [Fact]
         public async void Query()
         {
-            var block = new Block<NoOpAction>(
+            var block = new Block<NullAction>(
                 1,
                 1,
                 1,
@@ -26,7 +26,7 @@ namespace Libplanet.Explorer.UnitTests.GraphTypes
                 new Address(TestUtils.GetRandomBytes(Address.Size)),
                 new BlockHash(TestUtils.GetRandomBytes(HashDigest<SHA256>.Size)),
                 DateTimeOffset.UtcNow,
-                ImmutableArray<Transaction<NoOpAction>>.Empty,
+                ImmutableArray<Transaction<NullAction>>.Empty,
                 HashAlgorithmType.Of<SHA256>(),
                 stateRootHash: new HashDigest<SHA256>(
                     TestUtils.GetRandomBytes(HashDigest<SHA256>.Size)));
@@ -43,7 +43,7 @@ namespace Libplanet.Explorer.UnitTests.GraphTypes
                 }";
 
             ExecutionResult result =
-                await ExecuteQueryAsync<BlockType<NoOpAction>>(query, source: block);
+                await ExecuteQueryAsync<BlockType<NullAction>>(query, source: block);
             Dictionary<string, object> resultData = (Dictionary<string, object>)result.Data;
             Assert.Null(result.Errors);
             Assert.Equal(block.Index, resultData["index"]);
