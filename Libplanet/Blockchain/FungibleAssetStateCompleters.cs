@@ -32,7 +32,8 @@ namespace Libplanet.Blockchain
         public static readonly FungibleAssetStateCompleter<T> ComplementAll =
             (blockChain, blockHash, address, currency) =>
         {
-            throw new NotSupportedException("Placeholder.");
+                blockChain.ComplementAllBlockStates(blockHash);
+                return blockChain.GetBalance(address, currency, blockHash);
         };
 
         /// <summary>
@@ -41,7 +42,8 @@ namespace Libplanet.Blockchain
         public static readonly FungibleAssetStateCompleter<T> ComplementLatest =
             (blockChain, blockHash, address, currency) =>
         {
-            throw new NotSupportedException("Placeholder.");
+                blockChain.ComplementLatestBlockStates(blockHash);
+                return blockChain.GetBalance(address, currency, blockHash);
         };
 
         /// <summary>

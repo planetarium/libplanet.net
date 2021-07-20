@@ -1169,24 +1169,58 @@ namespace Libplanet.Tests.Blockchain
         }
 
         [Fact]
-        public void GetStateWithStateCompleter()
+        public void GetStateWithRecalculation()
         {
+            // Only chain[4] and chain[7] has stored states.
             (Address signer, Address[] addresses, BlockChain<DumbAction> chain)
                 = MakeIncompleteBlockStates();
-            StoreTracker store = (StoreTracker)chain.Store;
+            IStateStore stateStore = chain.StateStore;
 
+            Assert.False(stateStore.ContainsBlockStates(chain[6].Hash));
             IValue value = chain.GetState(
                 addresses[4],
-                chain.BlockHashes.Skip(addresses.Length).First(),
-                (bc, hash, addr) =>
-                {
-                    bc.RecalculateBlockStates(hash);
-                    return new Text($"{bc.Id}/{hash}/{addr}: callback called");
-                }
-            );
-            BlockHash prevUpdate = chain.BlockHashes.Skip(addresses.Length).First();
-            var expected = new Text($"{chain.Id}/{prevUpdate}/{addresses[4]}: callback called");
-            Assert.Equal(expected, value);
+                chain[6].Hash,
+                StateCompleters<DumbAction>.Recalculate);
+            Assert.True(stateStore.ContainsBlockStates(chain[2].Hash));
+            Assert.True(stateStore.ContainsBlockStates(chain[6].Hash));
+            Assert.False(stateStore.ContainsBlockStates(chain[8].Hash));
+        }
+
+        [Fact]
+        public void GetStateWithComplementAll()
+        {
+            // Only chain[4] and chain[7] has stored states.
+            (Address signer, Address[] addresses, BlockChain<DumbAction> chain)
+                = MakeIncompleteBlockStates();
+            IStateStore stateStore = chain.StateStore;
+
+            Assert.False(stateStore.ContainsBlockStates(
+                chain[6].Hash));
+            IValue value = chain.GetState(
+                addresses[4],
+                chain[6].Hash,
+                StateCompleters<DumbAction>.ComplementAll);
+            Assert.True(stateStore.ContainsBlockStates(chain[2].Hash));
+            Assert.True(stateStore.ContainsBlockStates(chain[6].Hash));
+            Assert.False(stateStore.ContainsBlockStates(chain[8].Hash));
+        }
+
+        [Fact]
+        public void GetStateWithComplementLatest()
+        {
+            // Only chain[4] and chain[7] has stored states.
+            (Address signer, Address[] addresses, BlockChain<DumbAction> chain)
+                = MakeIncompleteBlockStates();
+            IStateStore stateStore = chain.StateStore;
+
+            Assert.False(stateStore.ContainsBlockStates(chain[6].Hash));
+            IValue value = chain.GetState(
+                addresses[4],
+                chain[6].Hash,
+                StateCompleters<DumbAction>.ComplementLatest);
+            Assert.False(stateStore.ContainsBlockStates(chain[2].Hash));
+            Assert.True(stateStore.ContainsBlockStates(chain[6].Hash));
+            Assert.False(stateStore.ContainsBlockStates(chain[8].Hash));
         }
 
         [Fact]
@@ -1519,12 +1553,11 @@ namespace Libplanet.Tests.Blockchain
         /// <para>The fixture this makes has total 5 addresses (i.e., accounts;
         /// these go to the second item of the returned triple) and 11 blocks
         /// (these go to the third item of the returned triple). Every block
-        /// contains a transaction within an action that mutates one account
+        /// contains a transaction with an action that mutates one account
         /// state except for the genesis block.  All transactions in the fixture
         /// are signed by one private key (its address goes to the first item
         /// of the returned triple).  The most important thing is that
-        /// these blocks all lack its states except for the last block (tip).
-        /// Overall blocks in the fixture look like:</para>
+        /// overall blocks in the fixture look like:</para>
         ///
         /// <code>
         ///  Index   UpdatedAddresses   States in Store
@@ -1533,13 +1566,13 @@ namespace Libplanet.Tests.Blockchain
         ///      1   addresses[0]       Absent
         ///      2   addresses[1]       Absent
         ///      3   addresses[2]       Absent
-        ///      4   addresses[3]       Absent
+        ///      4   addresses[3]       Present
         ///      5   addresses[4]       Absent
         ///      6   addresses[0]       Absent
-        ///      7   addresses[1]       Absent
+        ///      7   addresses[1]       Present
         ///      8   addresses[2]       Absent
         ///      9   addresses[3]       Absent
-        ///     10   addresses[4]       Present
+        ///     10   addresses[4]       Absent
         /// </code>
         /// </summary>
         internal static (Address, Address[] Addresses, BlockChain<DumbAction> Chain)
@@ -1549,6 +1582,9 @@ namespace Libplanet.Tests.Blockchain
                 IRenderer<DumbAction> renderer = null
             )
         {
+            List<int> presentIndices = new List<int>() { 4, 7 };
+            List<Block<DumbAction>> presentBlocks = new List<Block<DumbAction>>();
+
             IBlockPolicy<DumbAction> blockPolicy = new NullPolicy<DumbAction>();
             store = new StoreTracker(store);
             Guid chainId = Guid.NewGuid();
@@ -1637,14 +1673,25 @@ namespace Libplanet.Tests.Blockchain
                     store.PutBlock(b);
                     BuildIndex(chainId, b);
                     Assert.Equal(b, chain[b.Hash]);
+                    if (presentIndices.Contains((int)b.Index))
+                    {
+                        presentBlocks.Add(b);
+                    }
                 }
             }
 
             if (stateStore is TrieStateStore trieStateStore)
             {
-                trieStateStore.PruneStates(ImmutableHashSet<BlockHash>.Empty.Add(b.Hash));
+                trieStateStore.PruneStates(
+                    ImmutableHashSet<BlockHash>.Empty
+                        .Add(presentBlocks[0].Hash)
+                        .Add(presentBlocks[1].Hash));
             }
 
+            // Just in case
+            Assert.True(stateStore.ContainsBlockStates(presentBlocks[0].Hash));
+            Assert.True(stateStore.ContainsBlockStates(presentBlocks[1].Hash));
+            Assert.False(stateStore.ContainsBlockStates(chain.Tip.Hash));
             return (signer, addresses, chain);
         }
 

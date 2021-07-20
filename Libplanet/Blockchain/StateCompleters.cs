@@ -29,7 +29,8 @@ namespace Libplanet.Blockchain
         public static readonly StateCompleter<T> ComplementAll =
             (blockChain, blockHash, address) =>
         {
-            throw new NotSupportedException("Placeholder.");
+            blockChain.ComplementAllBlockStates(blockHash);
+            return blockChain.GetState(address, blockHash);
         };
 
         /// <summary>
@@ -38,7 +39,8 @@ namespace Libplanet.Blockchain
         public static readonly StateCompleter<T> ComplementLatest =
             (blockChain, blockHash, address) =>
         {
-            throw new NotSupportedException("Placeholder.");
+            blockChain.ComplementLatestBlockStates(blockHash);
+            return blockChain.GetState(address, blockHash);
         };
 
         /// <summary>
