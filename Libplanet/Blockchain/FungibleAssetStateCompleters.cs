@@ -17,16 +17,34 @@ namespace Libplanet.Blockchain
         where T : IAction, new()
     {
         /// <summary>
-        /// Recalculates and complements a block's incomplete states on the fly.
-        /// Incomplete states are filled with the recalculated states and the states are
-        /// permanently remained in the store.
+        /// See <see cref="StateCompleterSet{T}.Recalculate"/>.
         /// </summary>
         public static readonly FungibleAssetStateCompleter<T> Recalculate =
             (blockChain, blockHash, address, currency) =>
             {
-                blockChain.ComplementBlockStates(blockHash);
+                blockChain.RecalculateBlockStates(blockHash);
                 return blockChain.GetBalance(address, currency, blockHash);
             };
+
+        /// <summary>
+        /// See <see cref="StateCompleterSet{T}.ComplementAll"/>.
+        /// </summary>
+        public static readonly FungibleAssetStateCompleter<T> ComplementAll =
+            (blockChain, blockHash, address, currency) =>
+        {
+                blockChain.ComplementAllBlockStates(blockHash);
+                return blockChain.GetBalance(address, currency, blockHash);
+        };
+
+        /// <summary>
+        /// See <see cref="StateCompleterSet{T}.ComplementLatest"/>.
+        /// </summary>
+        public static readonly FungibleAssetStateCompleter<T> ComplementLatest =
+            (blockChain, blockHash, address, currency) =>
+        {
+                blockChain.ComplementLatestBlockStates(blockHash);
+                return blockChain.GetBalance(address, currency, blockHash);
+        };
 
         /// <summary>
         /// Rejects to complement incomplete state and throws

@@ -3,7 +3,8 @@ using Libplanet.Action;
 namespace Libplanet.Blockchain
 {
     /// <summary>
-    /// Groups two kinds of state completers.
+    /// Groups two kinds of state completers, <see cref="StateCompleters{T}"/>
+    /// and <see cref="FungibleAssetStateCompleters{T}"/>.
     /// </summary>
     /// <typeparam name="T">An <see cref="IAction"/> type.  It should match
     /// to <see cref="BlockChain{T}"/>'s type parameter.</typeparam>
@@ -11,14 +12,43 @@ namespace Libplanet.Blockchain
         where T : IAction, new()
     {
         /// <summary>
-        /// Recalculates and complements a block's incomplete states on the fly.
-        /// Incomplete states are filled with the recalculated states and the states are
-        /// permanently remained in the store.
+        /// Recalculates <i>all</i> block states and complements missing states including and upto
+        /// a given hash starting from the genesis block.
         /// </summary>
+        /// <remarks>
+        /// Complemented states are permanently stored.
+        /// </remarks>
         public static readonly StateCompleterSet<T> Recalculate = new StateCompleterSet<T>
         {
             StateCompleter = StateCompleters<T>.Recalculate,
             FungibleAssetStateCompleter = FungibleAssetStateCompleters<T>.Recalculate,
+        };
+
+        /// <summary>
+        /// Recalculates and complements all <i>missing</i> block states including and upto
+        /// a given hash starting from the genesis block.
+        /// </summary>
+        /// <remarks>
+        /// Complemented states are permanently stored.
+        /// </remarks>
+        public static readonly StateCompleterSet<T> ComplementAll = new StateCompleterSet<T>
+        {
+            StateCompleter = StateCompleters<T>.ComplementAll,
+            FungibleAssetStateCompleter = FungibleAssetStateCompleters<T>.ComplementAll,
+        };
+
+        /// <summary>
+        /// Recalculates and complements all <i>missing</i> block states including and upto
+        /// a given hash starting from the last known states in state storage before
+        /// the given hash if the states are missing for the given hash.
+        /// </summary>
+        /// <remarks>
+        /// Complemented states are permanently stored.
+        /// </remarks>
+        public static readonly StateCompleterSet<T> ComplementLatest = new StateCompleterSet<T>
+        {
+            StateCompleter = StateCompleters<T>.ComplementLatest,
+            FungibleAssetStateCompleter = FungibleAssetStateCompleters<T>.ComplementLatest,
         };
 
         /// <summary>

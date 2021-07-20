@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Bencodex.Types;
 using Libplanet.Action;
@@ -14,13 +15,31 @@ namespace Libplanet.Blockchain
         where T : IAction, new()
     {
         /// <summary>
-        /// Recalculates and complements a block's incomplete states on the fly.
-        /// Incomplete states are filled with the recalculated states and the states are
-        /// permanently remained in the store.
+        /// See <see cref="StateCompleterSet{T}.Recalculate"/>.
         /// </summary>
         public static readonly StateCompleter<T> Recalculate = (blockChain, blockHash, address) =>
         {
-            blockChain.ComplementBlockStates(blockHash);
+            blockChain.RecalculateBlockStates(blockHash);
+            return blockChain.GetState(address, blockHash);
+        };
+
+        /// <summary>
+        /// See <see cref="StateCompleterSet{T}.ComplementAll"/>.
+        /// </summary>
+        public static readonly StateCompleter<T> ComplementAll =
+            (blockChain, blockHash, address) =>
+        {
+            blockChain.ComplementAllBlockStates(blockHash);
+            return blockChain.GetState(address, blockHash);
+        };
+
+        /// <summary>
+        /// See <see cref="StateCompleterSet{T}.ComplementLatest"/>.
+        /// </summary>
+        public static readonly StateCompleter<T> ComplementLatest =
+            (blockChain, blockHash, address) =>
+        {
+            blockChain.ComplementLatestBlockStates(blockHash);
             return blockChain.GetState(address, blockHash);
         };
 
