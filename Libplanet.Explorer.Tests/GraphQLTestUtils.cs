@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using GraphQL;
 using GraphQL.Types;
 
-namespace Libplanet.Explorer.UnitTests
+namespace Libplanet.Explorer.Tests
 {
     public static class GraphQLTestUtils
     {

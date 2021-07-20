@@ -1,6 +1,6 @@
 using System;
 
-namespace Libplanet.Explorer.UnitTests
+namespace Libplanet.Explorer.Tests
 {
     public static class TestUtils
     {

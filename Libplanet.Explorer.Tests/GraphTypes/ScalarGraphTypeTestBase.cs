@@ -1,6 +1,6 @@
 using GraphQL.Types;
 
-namespace Libplanet.Explorer.UnitTests.GraphTypes
+namespace Libplanet.Explorer.Tests.GraphTypes
 {
     public class ScalarGraphTypeTestBase<T>
         where T : ScalarGraphType, new()
