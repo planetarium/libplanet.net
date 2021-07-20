@@ -80,10 +80,10 @@ namespace Libplanet.Tests.Action
         [Fact]
         public void DetectLackOfActionType()
         {
-            var action = new ActionNotAttributeAnnotated();
+            var action = new NullAction();
 
             Assert.Throws<MissingActionTypeException>(
-                () => new PolymorphicAction<ActionNotAttributeAnnotated>(action)
+                () => new PolymorphicAction<NullAction>(action)
             );
         }
 
@@ -100,31 +100,6 @@ namespace Libplanet.Tests.Action
                 "Libplanet.Action.PolymorphicAction" +
                 "<Libplanet.Tests.Common.Action.DetectRehearsal>",
                 new PolymorphicAction<BaseAction>(new DetectRehearsal()).ToString());
-        }
-
-        private class ActionNotAttributeAnnotated : IAction
-        {
-            public ActionNotAttributeAnnotated()
-            {
-            }
-
-            public IValue PlainValue =>
-                default(Dictionary);
-
-            public void LoadPlainValue(
-                Dictionary plainValue)
-            {
-            }
-
-            public void LoadPlainValue(IValue plainValue)
-            {
-                LoadPlainValue((Dictionary)plainValue);
-            }
-
-            public IAccountStateDelta Execute(IActionContext context)
-            {
-                return context.PreviousStates;
-            }
         }
     }
 }

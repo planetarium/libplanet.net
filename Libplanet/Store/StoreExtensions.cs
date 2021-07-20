@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using Bencodex.Types;
 using Libplanet.Action;
 using Libplanet.Blocks;
 using Libplanet.Tx;
@@ -56,28 +55,6 @@ namespace Libplanet.Store
             if (from.GetCanonicalChainId() is Guid canonId)
             {
                 to.SetCanonicalChainId(canonId);
-            }
-        }
-
-        /// <summary>
-        /// An action implementation which does nothing for filling type parameter taking of
-        /// <see cref="IAction"/>.
-        /// </summary>
-        private class NullAction : IAction
-        {
-            private IValue _value;
-
-            /// <inheritdoc/>
-            public IValue PlainValue => _value;
-
-            /// <inheritdoc/>
-            public IAccountStateDelta Execute(IActionContext context) =>
-                context.PreviousStates;
-
-            /// <inheritdoc/>
-            public void LoadPlainValue(IValue plainValue)
-            {
-                _value = plainValue;
             }
         }
     }

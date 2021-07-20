@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
-using Bencodex.Types;
 using Libplanet.Action;
 using Libplanet.Explorer.Controllers;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
@@ -16,58 +13,30 @@ namespace Libplanet.Explorer.UnitTests.Controllers
         [Fact]
         public void ImplementsApplicationFeatureProvider()
         {
-            var sut = new GenericControllerFeatureProvider<TestAction>();
+            var sut = new GenericControllerFeatureProvider<NullAction>();
             Assert.IsAssignableFrom<IApplicationFeatureProvider<ControllerFeature>>(sut);
         }
 
         [Fact]
         public void PopulateFeatureAddsExplorerControllerOfType()
         {
-            var sut = new GenericControllerFeatureProvider<TestAction>();
+            var sut = new GenericControllerFeatureProvider<NullAction>();
             var feature = new ControllerFeature();
             sut.PopulateFeature(Enumerable.Empty<ApplicationPart>(), feature);
-            Assert.Contains(typeof(ExplorerController<TestAction>), feature.Controllers);
+            Assert.Contains(typeof(ExplorerController<NullAction>), feature.Controllers);
         }
 
         [Fact]
         public void PopulateFeatureDoesntAddExistingActionController()
         {
-            var sut = new GenericControllerFeatureProvider<TestAction>();
+            var sut = new GenericControllerFeatureProvider<NullAction>();
             var feature = new ControllerFeature();
-            feature.Controllers.Add(typeof(TestActionController).GetTypeInfo());
+            feature.Controllers.Add(typeof(NullActionController).GetTypeInfo());
             sut.PopulateFeature(Enumerable.Empty<ApplicationPart>(), feature);
-            Assert.DoesNotContain(typeof(ExplorerController<TestAction>), feature.Controllers);
+            Assert.DoesNotContain(typeof(ExplorerController<NullAction>), feature.Controllers);
         }
 
-        private class TestAction : IAction
-        {
-            public void LoadPlainValue(IValue plainValue)
-            {
-            }
-
-            public IAccountStateDelta Execute(IActionContext context) => context.PreviousStates;
-
-            public void Render(IActionContext context, IAccountStateDelta nextStates)
-            {
-            }
-
-            public void RenderError(IActionContext context, Exception exception)
-            {
-            }
-
-            public void Unrender(IActionContext context, IAccountStateDelta nextStates)
-            {
-            }
-
-            public void UnrenderError(IActionContext context, Exception exception)
-            {
-            }
-
-            public IValue PlainValue =>
-                default(Dictionary);
-        }
-
-        private class TestActionController
+        private class NullActionController
         {
         }
     }

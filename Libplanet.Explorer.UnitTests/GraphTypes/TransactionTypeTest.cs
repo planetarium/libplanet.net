@@ -1,13 +1,12 @@
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using GraphQL;
 using GraphQL.Types;
+using Libplanet.Action;
 using Libplanet.Blocks;
 using Libplanet.Crypto;
 using Libplanet.Explorer.GraphTypes;
-using Libplanet.Explorer.UnitTests.Common.Action;
 using Libplanet.Tx;
 using Xunit;
 using static Libplanet.Explorer.UnitTests.GraphQLTestUtils;
@@ -21,11 +20,11 @@ namespace Libplanet.Explorer.UnitTests.GraphTypes
         public async Task Query()
         {
             var privateKey = new PrivateKey();
-            var transaction = Transaction<NoOpAction>.Create(
+            var transaction = Transaction<NullAction>.Create(
                 0,
                 privateKey,
                 new BlockHash(TestUtils.GetRandomBytes(HashDigest<SHA256>.Size)),
-                new[] { new NoOpAction(), });
+                new[] { new NullAction() });
             var query =
                 @"{
                     id
@@ -38,7 +37,7 @@ namespace Libplanet.Explorer.UnitTests.GraphTypes
                 }";
 
             ExecutionResult result =
-                await ExecuteQueryAsync<TransactionType<NoOpAction>>(query, source: transaction);
+                await ExecuteQueryAsync<TransactionType<NullAction>>(query, source: transaction);
             Dictionary<string, object> resultData = (Dictionary<string, object>)result.Data;
             Assert.Null(result.Errors);
             Assert.Equal(transaction.Id.ToHex(), resultData["id"]);
