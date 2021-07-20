@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -271,6 +272,64 @@ namespace Libplanet.Tests.Net
                         Assert.Equal(DateTimeOffset.MinValue, state.LastUpdated);
                     }
                 }
+            }
+            finally
+            {
+                await StopAsync(swarmA);
+                await StopAsync(swarmB);
+                await StopAsync(swarmC);
+            }
+        }
+
+        [Fact(Timeout = Timeout)]
+        public async Task MaintainStaticPeers()
+        {
+            var keyA = new PrivateKey();
+            Swarm<DumbAction> swarmA = CreateSwarm(keyA, listenPort: 20000);
+            Swarm<DumbAction> swarmB = CreateSwarm(listenPort: 20001);
+            Swarm<DumbAction> swarmC = CreateSwarm(keyA, listenPort: 20000);
+
+            try
+            {
+                await StartAsync(swarmA);
+                await StartAsync(swarmB);
+
+                Swarm<DumbAction> swarm = CreateSwarm(
+                    options: new SwarmOptions
+                    {
+                        StaticPeers = new[]
+                        {
+                            (BoundPeer)swarmA.AsPeer,
+                            (BoundPeer)swarmB.AsPeer,
+                        }.ToImmutableHashSet(),
+                        StaticPeersMaintainPeriod = TimeSpan.FromMilliseconds(100),
+                    });
+
+                await StartAsync(swarm);
+                await Task.Delay(500);
+                Assert.Contains(swarmA.AsPeer, swarm.Peers);
+                Assert.Contains(swarmB.AsPeer, swarm.Peers);
+
+                _logger.Debug("Address of swarmA: {Address}", swarmA.Address);
+                await StopAsync(swarmA);
+                await Task.Delay(100);
+                await swarm.PeerDiscovery.RefreshTableAsync(
+                    TimeSpan.Zero,
+                    default(CancellationToken));
+                // Invoke once more in case of swarmA and swarmB is in the same bucket,
+                // and swarmA is last updated.
+                await swarm.PeerDiscovery.RefreshTableAsync(
+                    TimeSpan.Zero,
+                    default(CancellationToken));
+                Assert.DoesNotContain(swarmA.AsPeer, swarm.Peers);
+                Assert.Contains(swarmB.AsPeer, swarm.Peers);
+
+                await StartAsync(swarmC);
+                await Task.Delay(500);
+                Assert.Contains(swarmC.AsPeer, swarm.Peers);
+                Assert.Contains(swarmB.AsPeer, swarm.Peers);
+
+                await StopAsync(swarm);
             }
             finally
             {
